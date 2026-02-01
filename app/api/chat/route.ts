@@ -26,8 +26,8 @@ export async function POST(request: NextRequest) {
     
     const genAI = new GoogleGenerativeAI(apiKey);
     
-    // Use gemini-1.5-flash (available model)
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    // Use gemini-2.5-flash (stable model, best price-performance)
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     // Build conversation history for Gemini
     let chatHistory: any[] = [];
