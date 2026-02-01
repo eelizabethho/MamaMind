@@ -2,14 +2,128 @@
 
 import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
-import { useState, useRef, useEffect } from "react";
+import { useSession } from "next-auth/react";
+import React, { useState, useRef, useEffect } from "react";
 
 interface Message {
   role: "user" | "assistant";
   content: string;
 }
 
+// Simple markdown renderer for bold, italic, and lists
+const renderMarkdown = (text: string) => {
+  let key = 0;
+
+  // First, handle bold text
+  const boldRegex = /\*\*([^*]+)\*\*/g;
+  let match;
+  let currentIndex = 0;
+  const elements: (string | React.ReactElement)[] = [];
+
+  while ((match = boldRegex.exec(text)) !== null) {
+    // Add text before the match
+    if (match.index > currentIndex) {
+      const beforeText = text.substring(currentIndex, match.index);
+      if (beforeText) {
+        elements.push(beforeText);
+      }
+    }
+    
+    // Add bold element
+    elements.push(
+      <strong key={`bold-${key++}`} style={{ fontWeight: 600 }}>
+        {match[1]}
+      </strong>
+    );
+    
+    currentIndex = match.index + match[0].length;
+  }
+
+  // Add remaining text
+  if (currentIndex < text.length) {
+    elements.push(text.substring(currentIndex));
+  }
+
+  // Now process italic in the result
+  const result: (string | React.ReactElement)[] = [];
+  elements.forEach((element, idx) => {
+    if (typeof element === 'string') {
+      const italicRegex = /\*([^*]+)\*/g;
+      let italicMatch;
+      let italicIndex = 0;
+      let italicKey = 0;
+
+      while ((italicMatch = italicRegex.exec(element)) !== null) {
+        if (italicMatch.index > italicIndex) {
+          const beforeText = element.substring(italicIndex, italicMatch.index);
+          if (beforeText) {
+            result.push(beforeText);
+          }
+        }
+        
+        result.push(
+          <em key={`italic-${idx}-${italicKey++}`} style={{ fontStyle: 'italic' }}>
+            {italicMatch[1]}
+          </em>
+        );
+        
+        italicIndex = italicMatch.index + italicMatch[0].length;
+      }
+
+      if (italicIndex < element.length) {
+        result.push(element.substring(italicIndex));
+      }
+    } else {
+      result.push(element);
+    }
+  });
+
+  // Handle line breaks and bullet points
+  const finalResult: (string | React.ReactElement)[] = [];
+  result.forEach((element, idx) => {
+    if (typeof element === 'string') {
+      const lines = element.split('\n');
+      lines.forEach((line, lineIdx) => {
+        if (lineIdx > 0) {
+          finalResult.push(<br key={`br-${idx}-${lineIdx}`} />);
+        }
+        
+        // Check if line starts with bullet point
+        if (line.trim().startsWith('* ') || line.trim().startsWith('- ')) {
+          const bulletContent = line.trim().substring(2);
+          // Process markdown in bullet content
+          const bulletParts: (string | React.ReactElement)[] = [];
+          const boldParts = bulletContent.split(/(\*\*[^*]+\*\*)/g);
+          boldParts.forEach((part, partIdx) => {
+            if (part.startsWith('**') && part.endsWith('**')) {
+              bulletParts.push(
+                <strong key={`bullet-bold-${idx}-${lineIdx}-${partIdx}`} style={{ fontWeight: 600 }}>
+                  {part.slice(2, -2)}
+                </strong>
+              );
+            } else if (part) {
+              bulletParts.push(part);
+            }
+          });
+          finalResult.push(
+            <span key={`bullet-${idx}-${lineIdx}`} style={{ display: 'block', marginLeft: '1rem', marginTop: '0.25rem' }}>
+              • {bulletParts}
+            </span>
+          );
+        } else {
+          finalResult.push(line);
+        }
+      });
+    } else {
+      finalResult.push(element);
+    }
+  });
+
+  return finalResult.length > 0 ? finalResult : [text];
+};
+
 export default function Page() {
+  const { data: session } = useSession();
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
@@ -18,7 +132,22 @@ export default function Page() {
   ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [customProfileImage, setCustomProfileImage] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Load custom profile image from localStorage (same as Sidebar)
+  useEffect(() => {
+    if (session?.user?.email) {
+      const savedImage = localStorage.getItem(`profile_image_${session.user.email}`);
+      if (savedImage) {
+        setCustomProfileImage(savedImage);
+      }
+    }
+  }, [session?.user?.email]);
+
+  // Use custom image if available, otherwise use Google image
+  const displayImage = customProfileImage || session?.user?.image || null;
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -27,6 +156,13 @@ export default function Page() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  useEffect(() => {
+    // Auto-focus input when not loading
+    if (!isLoading && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isLoading]);
 
   const sendMessage = async (content?: string) => {
     const messageContent = content || input.trim();
@@ -84,14 +220,58 @@ export default function Page() {
   };
 
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        flexDirection: "column",
-        backgroundColor: "#f5f5f0",
-      }}
-    >
+    <>
+      <style>{`
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        @keyframes pulse {
+          0%, 100% {
+            opacity: 1;
+            transform: scale(1);
+          }
+          50% {
+            opacity: 0.5;
+            transform: scale(0.9);
+          }
+        }
+        @keyframes blink {
+          0%, 50% {
+            opacity: 1;
+          }
+          51%, 100% {
+            opacity: 0;
+          }
+        }
+        @keyframes popIn {
+          0% {
+            opacity: 0;
+            transform: scale(0.3) translateY(10px);
+          }
+          50% {
+            transform: scale(1.1) translateY(-2px);
+          }
+          100% {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+          }
+        }
+      `}</style>
+      <main
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          flexDirection: "column",
+          backgroundColor: "#f5f5f0",
+        }}
+      >
       <Navbar />
 
       {/* Main Content Area */}
@@ -153,11 +333,12 @@ export default function Page() {
               style={{
                 flex: 1,
                 overflowY: "auto",
-                padding: "1rem 1.5rem",
+                padding: "1.5rem",
                 display: "flex",
                 flexDirection: "column",
-                gap: "1rem",
+                gap: "1.25rem",
                 backgroundColor: "#fefefe",
+                scrollBehavior: "smooth",
               }}
             >
               {messages.map((message, index) => (
@@ -168,33 +349,96 @@ export default function Page() {
                     alignItems: "flex-start",
                     gap: "0.75rem",
                     justifyContent: message.role === "user" ? "flex-end" : "flex-start",
+                    animation: "fadeIn 0.3s ease-in",
                   }}
                 >
                   {message.role === "assistant" && (
                     <div
                       style={{
-                        width: "36px",
-                        height: "36px",
+                        width: "40px",
+                        height: "40px",
                         borderRadius: "50%",
-                        backgroundColor: "#cbd5e0",
-                        backgroundImage: "url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%2394a3b8%22%3E%3Cpath d=%22M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z%22/%3E%3C/svg%3E')",
-                        backgroundSize: "cover",
+                        backgroundColor: "#9f7aea",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
                         flexShrink: 0,
+                        boxShadow: "0 2px 4px rgba(159, 122, 234, 0.2)",
                       }}
-                    />
+                    >
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="white"
+                        strokeWidth="2"
+                      >
+                        <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                        <path d="M2 17l10 5 10-5" />
+                        <path d="M2 12l10 5 10-5" />
+                      </svg>
+                    </div>
                   )}
                   <div
                     style={{
-                      backgroundColor: message.role === "user" ? "#90cdf4" : "#e2e8f0",
-                      padding: "0.75rem 1rem",
-                      borderRadius: "16px",
-                      maxWidth: "70%",
-                      color: message.role === "user" ? "#1a202c" : "#2d3748",
-                      fontSize: "0.9rem",
+                      backgroundColor: message.role === "user" ? "#9f7aea" : "#f7fafc",
+                      padding: "0.875rem 1.125rem",
+                      borderRadius: message.role === "user" ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
+                      maxWidth: "75%",
+                      color: message.role === "user" ? "white" : "#2d3748",
+                      fontSize: "0.95rem",
+                      lineHeight: "1.6",
+                      wordWrap: "break-word",
+                      whiteSpace: "pre-wrap",
+                      boxShadow: message.role === "user" 
+                        ? "0 2px 8px rgba(159, 122, 234, 0.15)" 
+                        : "0 1px 3px rgba(0, 0, 0, 0.08)",
+                      transition: "all 0.2s ease",
                     }}
                   >
-                    {message.content}
+                    {renderMarkdown(message.content)}
                   </div>
+                  {message.role === "user" && (
+                    <div
+                      style={{
+                        width: "40px",
+                        height: "40px",
+                        borderRadius: "50%",
+                        backgroundColor: "#90cdf4",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                        boxShadow: "0 2px 4px rgba(144, 205, 244, 0.2)",
+                        overflow: "hidden",
+                      }}
+                    >
+                      {displayImage ? (
+                        <img
+                          src={displayImage}
+                          alt={session?.user?.name || "User"}
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "cover",
+                          }}
+                        />
+                      ) : (
+                        <svg
+                          width="20"
+                          height="20"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="white"
+                          strokeWidth="2"
+                        >
+                          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                          <circle cx="12" cy="7" r="4" />
+                        </svg>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
               
@@ -204,32 +448,70 @@ export default function Page() {
                     display: "flex",
                     alignItems: "flex-start",
                     gap: "0.75rem",
+                    animation: "fadeIn 0.3s ease-in",
                   }}
                 >
                   <div
                     style={{
-                      width: "36px",
-                      height: "36px",
+                      width: "40px",
+                      height: "40px",
                       borderRadius: "50%",
-                      backgroundColor: "#cbd5e0",
-                      backgroundImage: "url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%2394a3b8%22%3E%3Cpath d=%22M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z%22/%3E%3C/svg%3E')",
-                      backgroundSize: "cover",
+                      backgroundColor: "#9f7aea",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
                       flexShrink: 0,
-                    }}
-                  />
-                  <div
-                    style={{
-                      backgroundColor: "#e2e8f0",
-                      padding: "0.75rem 1rem",
-                      borderRadius: "16px",
-                      color: "#2d3748",
-                      fontSize: "0.9rem",
+                      boxShadow: "0 2px 4px rgba(159, 122, 234, 0.2)",
                     }}
                   >
-                    <div style={{ display: "flex", gap: "4px" }}>
-                      <span style={{ animation: "bounce 1s infinite" }}>●</span>
-                      <span style={{ animation: "bounce 1s infinite 0.2s" }}>●</span>
-                      <span style={{ animation: "bounce 1s infinite 0.4s" }}>●</span>
+                    <svg
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="white"
+                      strokeWidth="2"
+                    >
+                      <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                      <path d="M2 17l10 5 10-5" />
+                      <path d="M2 12l10 5 10-5" />
+                    </svg>
+                  </div>
+                  <div
+                    style={{
+                      backgroundColor: "#f7fafc",
+                      padding: "0.875rem 1.125rem",
+                      borderRadius: "18px 18px 18px 4px",
+                      color: "#2d3748",
+                      fontSize: "0.95rem",
+                      boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)",
+                    }}
+                  >
+                    <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                      <span style={{ 
+                        width: "8px", 
+                        height: "8px", 
+                        borderRadius: "50%", 
+                        backgroundColor: "#9f7aea",
+                        animation: "pulse 1.4s ease-in-out infinite",
+                        display: "inline-block",
+                      }} />
+                      <span style={{ 
+                        width: "8px", 
+                        height: "8px", 
+                        borderRadius: "50%", 
+                        backgroundColor: "#9f7aea",
+                        animation: "pulse 1.4s ease-in-out infinite 0.2s",
+                        display: "inline-block",
+                      }} />
+                      <span style={{ 
+                        width: "8px", 
+                        height: "8px", 
+                        borderRadius: "50%", 
+                        backgroundColor: "#9f7aea",
+                        animation: "pulse 1.4s ease-in-out infinite 0.4s",
+                        display: "inline-block",
+                      }} />
                     </div>
                   </div>
                 </div>
@@ -260,15 +542,20 @@ export default function Page() {
                   cursor: isLoading ? "not-allowed" : "pointer",
                   opacity: isLoading ? 0.6 : 1,
                   transition: "all 0.2s ease",
+                  boxShadow: "0 2px 4px rgba(214, 158, 46, 0.2)",
                 }}
                 onMouseEnter={(e) => {
                   if (!isLoading) {
                     e.currentTarget.style.backgroundColor = "#c0841c";
+                    e.currentTarget.style.transform = "translateY(-1px)";
+                    e.currentTarget.style.boxShadow = "0 4px 8px rgba(214, 158, 46, 0.3)";
                   }
                 }}
                 onMouseLeave={(e) => {
                   if (!isLoading) {
                     e.currentTarget.style.backgroundColor = "#d69e2e";
+                    e.currentTarget.style.transform = "translateY(0)";
+                    e.currentTarget.style.boxShadow = "0 2px 4px rgba(214, 158, 46, 0.2)";
                   }
                 }}
               >
@@ -288,15 +575,20 @@ export default function Page() {
                   cursor: isLoading ? "not-allowed" : "pointer",
                   opacity: isLoading ? 0.6 : 1,
                   transition: "all 0.2s ease",
+                  boxShadow: "0 2px 4px rgba(144, 205, 244, 0.2)",
                 }}
                 onMouseEnter={(e) => {
                   if (!isLoading) {
                     e.currentTarget.style.backgroundColor = "#7bb8e8";
+                    e.currentTarget.style.transform = "translateY(-1px)";
+                    e.currentTarget.style.boxShadow = "0 4px 8px rgba(144, 205, 244, 0.3)";
                   }
                 }}
                 onMouseLeave={(e) => {
                   if (!isLoading) {
                     e.currentTarget.style.backgroundColor = "#90cdf4";
+                    e.currentTarget.style.transform = "translateY(0)";
+                    e.currentTarget.style.boxShadow = "0 2px 4px rgba(144, 205, 244, 0.2)";
                   }
                 }}
               >
@@ -316,15 +608,20 @@ export default function Page() {
                   cursor: isLoading ? "not-allowed" : "pointer",
                   opacity: isLoading ? 0.6 : 1,
                   transition: "all 0.2s ease",
+                  boxShadow: "0 2px 4px rgba(144, 205, 244, 0.2)",
                 }}
                 onMouseEnter={(e) => {
                   if (!isLoading) {
                     e.currentTarget.style.backgroundColor = "#7bb8e8";
+                    e.currentTarget.style.transform = "translateY(-1px)";
+                    e.currentTarget.style.boxShadow = "0 4px 8px rgba(144, 205, 244, 0.3)";
                   }
                 }}
                 onMouseLeave={(e) => {
                   if (!isLoading) {
                     e.currentTarget.style.backgroundColor = "#90cdf4";
+                    e.currentTarget.style.transform = "translateY(0)";
+                    e.currentTarget.style.boxShadow = "0 2px 4px rgba(144, 205, 244, 0.2)";
                   }
                 }}
               >
@@ -344,15 +641,20 @@ export default function Page() {
                   cursor: isLoading ? "not-allowed" : "pointer",
                   opacity: isLoading ? 0.6 : 1,
                   transition: "all 0.2s ease",
+                  boxShadow: "0 2px 4px rgba(144, 205, 244, 0.2)",
                 }}
                 onMouseEnter={(e) => {
                   if (!isLoading) {
                     e.currentTarget.style.backgroundColor = "#7bb8e8";
+                    e.currentTarget.style.transform = "translateY(-1px)";
+                    e.currentTarget.style.boxShadow = "0 4px 8px rgba(144, 205, 244, 0.3)";
                   }
                 }}
                 onMouseLeave={(e) => {
                   if (!isLoading) {
                     e.currentTarget.style.backgroundColor = "#90cdf4";
+                    e.currentTarget.style.transform = "translateY(0)";
+                    e.currentTarget.style.boxShadow = "0 2px 4px rgba(144, 205, 244, 0.2)";
                   }
                 }}
               >
@@ -384,6 +686,15 @@ export default function Page() {
                   alignItems: "center",
                   justifyContent: "center",
                   color: "#718096",
+                  transition: "all 0.2s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "#edf2f7";
+                  e.currentTarget.style.color = "#4a5568";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "transparent";
+                  e.currentTarget.style.color = "#718096";
                 }}
               >
                 <svg
@@ -403,6 +714,7 @@ export default function Page() {
 
               {/* Input Field */}
               <input
+                ref={inputRef}
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
@@ -411,14 +723,24 @@ export default function Page() {
                 disabled={isLoading}
                 style={{
                   flex: 1,
-                  padding: "0.75rem 1rem",
-                  border: "none",
+                  padding: "0.875rem 1.25rem",
+                  border: "2px solid transparent",
                   borderRadius: "24px",
                   outline: "none",
-                  fontSize: "0.9rem",
+                  fontSize: "0.95rem",
                   backgroundColor: "white",
                   color: "#2d3748",
                   opacity: isLoading ? 0.6 : 1,
+                  transition: "all 0.2s ease",
+                  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.05)",
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = "#9f7aea";
+                  e.target.style.boxShadow = "0 0 0 3px rgba(159, 122, 234, 0.1)";
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = "transparent";
+                  e.target.style.boxShadow = "0 1px 3px rgba(0, 0, 0, 0.05)";
                 }}
               />
 
@@ -427,8 +749,8 @@ export default function Page() {
                 onClick={() => sendMessage()}
                 disabled={isLoading || !input.trim()}
                 style={{
-                  width: "40px",
-                  height: "40px",
+                  width: "44px",
+                  height: "44px",
                   borderRadius: "50%",
                   backgroundColor: isLoading || !input.trim() ? "#cbd5e0" : "#9f7aea",
                   color: "white",
@@ -438,15 +760,22 @@ export default function Page() {
                   alignItems: "center",
                   justifyContent: "center",
                   transition: "all 0.2s ease",
+                  boxShadow: isLoading || !input.trim() 
+                    ? "none" 
+                    : "0 2px 6px rgba(159, 122, 234, 0.3)",
                 }}
                 onMouseEnter={(e) => {
                   if (!isLoading && input.trim()) {
                     e.currentTarget.style.backgroundColor = "#8b6bb1";
+                    e.currentTarget.style.transform = "scale(1.05)";
+                    e.currentTarget.style.boxShadow = "0 4px 12px rgba(159, 122, 234, 0.4)";
                   }
                 }}
                 onMouseLeave={(e) => {
                   if (!isLoading && input.trim()) {
                     e.currentTarget.style.backgroundColor = "#9f7aea";
+                    e.currentTarget.style.transform = "scale(1)";
+                    e.currentTarget.style.boxShadow = "0 2px 6px rgba(159, 122, 234, 0.3)";
                   }
                 }}
               >
@@ -466,5 +795,6 @@ export default function Page() {
         </div>
       </div>
     </main>
+    </>
   );
 }
