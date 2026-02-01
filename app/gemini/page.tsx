@@ -57,15 +57,18 @@ export default function Page() {
           { role: "assistant", content: data.message },
         ]);
       } else {
-        throw new Error(data.error || "Failed to get response");
+        // Show the detailed error from the API
+        const errorMsg = data.message || data.details || data.error || "Failed to get response";
+        throw new Error(errorMsg);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error:", error);
+      const errorMessage = error?.message || "Unknown error occurred";
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
-          content: "Sorry, I encountered an error. Please make sure your GEMINI_API_KEY is set in .env file.",
+          content: `Sorry, I encountered an error: ${errorMessage}`,
         },
       ]);
     } finally {
