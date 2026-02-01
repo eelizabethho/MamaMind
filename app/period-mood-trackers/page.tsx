@@ -1,6 +1,15 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { 
+  ChevronLeft, 
+  ChevronRight, 
+  Calendar, 
+  List, 
+  Droplet, 
+  Settings2, 
+  HelpCircle 
+} from 'lucide-react';
 
 const THEME = {
   eggplant: '#2D1B2D',
@@ -13,6 +22,7 @@ const THEME = {
 };
 
 export default function Page() {
+  // --- CORE TRACKER STATE ---
   const [viewDate, setViewDate] = useState(new Date());
   const [currentView, setCurrentView] = useState<'calendar' | 'table'>('calendar');
   const [allPeriods, setAllPeriods] = useState<Record<string, number[]>>({});
@@ -26,6 +36,7 @@ export default function Page() {
   ]);
   const [activeMoodIndex, setActiveMoodIndex] = useState(0);
 
+  // --- PERSISTENCE ---
   useEffect(() => {
     const savedPeriods = localStorage.getItem('all-periods');
     const savedMoods = localStorage.getItem('all-moods');
@@ -41,9 +52,12 @@ export default function Page() {
     localStorage.setItem('mood-palette', JSON.stringify(palette));
   }, [allPeriods, allMoods, palette]);
 
+  // --- CALENDAR LOGIC ---
   const currentYear = viewDate.getFullYear();
   const currentMonth = viewDate.getMonth();
   const currentMonthKey = `${currentYear}-${currentMonth}`;
+  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+  const startDay = new Date(currentYear, currentMonth, 1).getDay();
 
   const togglePeriod = (mKey: string, day: number) => {
     setAllPeriods(prev => {
@@ -54,27 +68,6 @@ export default function Page() {
       return { ...prev, [mKey]: newData };
     });
   };
-
-  const fullHistory = useMemo(() => {
-    const keys = Object.keys(allPeriods).sort((a, b) => {
-      const [yA, mA] = a.split('-').map(Number);
-      const [yB, mB] = b.split('-').map(Number);
-      return yB !== yA ? yB - yA : mB - mA;
-    });
-    return keys.map(key => {
-      const [y, m] = key.split('-').map(Number);
-      const days = allPeriods[key] || [];
-      const ranges = [];
-      if (days.length > 0) {
-        let start = days[0], end = days[0];
-        for (let i = 1; i <= days.length; i++) {
-          if (days[i] === end + 1) { end = days[i]; } 
-          else { ranges.push({ start, end }); start = days[i]; end = days[i]; }
-        }
-      }
-      return { key, label: new Date(y, m).toLocaleString('default', { month: 'long', year: 'numeric' }), ranges };
-    }).filter(item => item.ranges.length > 0);
-  }, [allPeriods]);
 
   const averageCycle = useMemo(() => {
     const startDates: Date[] = [];
@@ -91,131 +84,180 @@ export default function Page() {
     return Math.round(totalDays / (startDates.length - 1));
   }, [allPeriods]);
 
-  return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: THEME.cream, color: THEME.eggplant }}>
-      
-      {/* --- PURPLE HEADER FROM IMAGE --- */}
-      <header style={{
-        backgroundColor: THEME.plum,
-        height: '70px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '0 40px',
-        boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
-        zIndex: 100
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-          <div style={{
-            width: '42px',
-            height: '42px',
-            borderRadius: '50%',
-            border: '1.5px solid rgba(255,255,255,0.4)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.5">
-               <path d="M12 21c-4.418 0-8-3.582-8-8 0-4.418 3.582-8 8-8s8 3.582 8 8c0 4.418-3.582 8-8 8z" />
-               <path d="M12 11c1.657 0 3-1.343 3-3S13.657 5 12 5 9 6.343 9 8s1.343 3 3 3z" />
-            </svg>
-          </div>
-          <span style={{ color: 'white', fontSize: '26px', fontFamily: '"Brush Script MT", cursive' }}>Avec Ma</span>
-        </div>
+  const fullHistory = useMemo(() => {
+    const keys = Object.keys(allPeriods).sort((a, b) => {
+      const [yA, mA] = a.split('-').map(Number);
+      const [yB, mB] = b.split('-').map(Number);
+      return yB !== yA ? yB - yA : mB - mA;
+    });
+    return keys.map(key => {
+      const [y, m] = key.split('-').map(Number);
+      const days = allPeriods[key] || [];
+      const ranges = [];
+      if (days.length > 0) {
+        let start = days[0], end = days[0];
+        for (let i = 1; i <= days.length; i++) {
+          if (days[i] === end + 1) end = days[i];
+          else { ranges.push({ start, end }); start = days[i]; end = days[i]; }
+        }
+        ranges.push({ start, end });
+      }
+      return { key, label: new Date(y, m).toLocaleString('default', { month: 'long', year: 'numeric' }), ranges };
+    }).filter(item => item.ranges.length > 0);
+  }, [allPeriods]);
 
-        <nav style={{ display: 'flex', gap: '10px' }}>
+  return (
+    <div className="min-h-screen flex flex-col" style={{ backgroundColor: THEME.cream, color: THEME.eggplant, fontFamily: 'ui-rounded, "Hiragino Maru Gothic ProN", sans-serif' }}>
+      
+      {/* --- REFINED PURPLE HEADER --- */}
+      <header style={{ backgroundColor: THEME.plum }} className="h-20 flex items-center justify-between px-10 shadow-lg z-50">
+        <div className="flex items-center gap-4">
+          <div className="w-10 h-10 rounded-full border border-white/30 flex items-center justify-center">
+            <Calendar className="text-white w-5 h-5" />
+          </div>
+          <span className="text-white text-2xl" style={{ fontFamily: '"Brush Script MT", cursive' }}>Avec Ma</span>
+        </div>
+        <nav className="flex gap-2">
           {['Home', 'Chat', 'Messages', 'Sign In'].map((item) => (
-            <button key={item} style={{
-              background: item === 'Home' ? 'rgba(255,255,255,0.15)' : 'transparent',
-              border: 'none',
-              borderRadius: '20px',
-              padding: '8px 18px',
-              color: 'white',
-              fontSize: '14px',
-              fontWeight: '500',
-              cursor: 'pointer'
-            }}>{item}</button>
+            <button key={item} className="text-white/80 hover:text-white px-5 py-2 rounded-full text-sm font-medium transition-all hover:bg-white/10">
+              {item}
+            </button>
           ))}
         </nav>
       </header>
 
-      {/* --- ORIGINAL CONTENT --- */}
-      <main style={{ padding: "3rem 2rem", fontFamily: 'ui-rounded, "Hiragino Maru Gothic ProN", sans-serif', maxWidth: '1400px', width: '95%', margin: '0 auto', display: 'flex', gap: '3rem', flex: 1 }}>
-        <section style={{ flex: 4 }}>
-          <header style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2rem', alignItems: 'flex-end' }}>
+      {/* --- MAIN CONTENT AREA --- */}
+      <main className="max-w-[1400px] mx-auto w-full p-8 md:p-12 grid grid-cols-12 gap-10 flex-1">
+        
+        {/* CALENDAR SECTION */}
+        <div className="col-span-12 lg:col-span-8 space-y-8">
+          <header className="flex justify-between items-end">
             <div>
-              <h1 style={{ margin: 0, fontSize: '2.5rem', fontWeight: '800', color: THEME.plum }}>{viewDate.toLocaleString('default', { month: 'long', year: 'numeric' })}</h1>
-              <button onClick={() => setCurrentView(currentView === 'calendar' ? 'table' : 'calendar')} style={{ marginTop: '12px', padding: '8px 16px', cursor: 'pointer', borderRadius: '12px', border: `2px solid ${THEME.sand}`, background: '#fff', color: THEME.plum, fontSize: '0.9rem', fontWeight: '600' }}>
-                  {currentView === 'calendar' ? '✨ View History' : '📅 Back to Calendar'}
-              </button>
+              <h1 className="text-5xl font-serif tracking-tight text-ma-eggplant">
+                {viewDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
+              </h1>
+              <p className="opacity-40 text-lg mt-2 italic">A sanctuary for your wellness tracking.</p>
             </div>
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <button onClick={() => setViewDate(new Date(currentYear, currentMonth - 1, 1))} style={{ padding: '10px 20px', cursor: 'pointer', borderRadius: '12px', border: 'none', background: THEME.sand, color: THEME.eggplant, fontWeight: 'bold' }}>←</button>
-              <button onClick={() => setViewDate(new Date(currentYear, currentMonth + 1, 1))} style={{ padding: '10px 20px', cursor: 'pointer', borderRadius: '12px', border: 'none', background: THEME.sand, color: THEME.eggplant, fontWeight: 'bold' }}>→</button>
+            
+            <div className="flex gap-3">
+              <button onClick={() => setCurrentView(currentView === 'calendar' ? 'table' : 'calendar')}
+                className="flex items-center gap-2 bg-white border border-ma-sand px-6 py-3 rounded-full shadow-sm hover:shadow-md transition-all font-bold text-sm">
+                {currentView === 'calendar' ? <List size={18}/> : <Calendar size={18}/>}
+                {currentView === 'calendar' ? 'History List' : 'Calendar View'}
+              </button>
+              <div className="flex bg-white/50 rounded-full p-1 border border-ma-sand">
+                <button onClick={() => setViewDate(new Date(currentYear, currentMonth - 1, 1))} className="p-2 hover:bg-white rounded-full transition-all"><ChevronLeft/></button>
+                <button onClick={() => setViewDate(new Date(currentYear, currentMonth + 1, 1))} className="p-2 hover:bg-white rounded-full transition-all"><ChevronRight/></button>
+              </div>
             </div>
           </header>
 
           {currentView === 'calendar' ? (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '12px', textAlign: 'center' }}>
-              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => <div key={day} style={{ fontWeight: '700', color: THEME.rose, textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '2px', paddingBottom: '10px' }}>{day}</div>)}
-              {[...Array(new Date(currentYear, currentMonth, 1).getDay()).fill(null), ...Array.from({ length: new Date(currentYear, currentMonth + 1, 0).getDate() }, (_, i) => i + 1)].map((day, i) => {
-                const moodColor = day ? (allMoods[currentMonthKey]?.[day]) : null;
-                const hasPeriod = day ? (allPeriods[currentMonthKey]?.includes(day)) : false;
-                return (
-                  <div key={i} onClick={() => day && setAllMoods(prev => ({...prev, [currentMonthKey]: {...prev[currentMonthKey], [day]: prev[currentMonthKey]?.[day] === palette[activeMoodIndex].color ? '' : palette[activeMoodIndex].color }}))}
-                    style={{ height: '110px', position: 'relative', borderRadius: '16px', cursor: day ? 'pointer' : 'default', backgroundColor: moodColor || (day ? '#fff' : 'transparent'), border: day ? `2px solid ${THEME.sand}` : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', fontWeight: '600' }}>
-                    {day}
-                    {day && (
-                      <div onClick={(e) => { e.stopPropagation(); togglePeriod(currentMonthKey, day); }} style={{ position: 'absolute', bottom: '10px', right: '10px', cursor: 'pointer', color: hasPeriod ? THEME.terracotta : THEME.sand }}>
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5C12 2.5 6 9 6 14.5C6 17.81 8.69 20.5 12 20.5C15.31 20.5 18 17.81 18 14.5C18 9 12 2.5 12 2.5Z" /></svg>
+            <div className="bg-white/40 rounded-[2.5rem] p-10 border border-white shadow-sm">
+              <div className="grid grid-cols-7 gap-4">
+                {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(d => (
+                  <div key={d} className="text-center text-[10px] font-bold opacity-30 uppercase tracking-[.2em] mb-4">{d}</div>
+                ))}
+
+                {[...Array(startDay)].map((_, i) => <div key={`e-${i}`} />)}
+
+                {[...Array(daysInMonth)].map((_, i) => {
+                  const dayNum = i + 1;
+                  const moodColor = allMoods[currentMonthKey]?.[dayNum];
+                  const hasPeriod = allPeriods[currentMonthKey]?.includes(dayNum);
+
+                  return (
+                    <div key={dayNum}
+                      onClick={() => setAllMoods(prev => ({...prev, [currentMonthKey]: {...prev[currentMonthKey], [dayNum]: prev[currentMonthKey]?.[dayNum] === palette[activeMoodIndex].color ? '' : palette[activeMoodIndex].color }}))}
+                      className="aspect-square rounded-[1.8rem] p-3 border transition-all flex flex-col justify-between group cursor-pointer bg-white/20 hover:bg-white hover:shadow-md border-white"
+                      style={{ backgroundColor: moodColor || '' }}
+                    >
+                      <span className="text-sm font-semibold opacity-40">{dayNum}</span>
+                      <div className="flex justify-end">
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); togglePeriod(currentMonthKey, dayNum); }}
+                          className={`transition-transform hover:scale-125 ${hasPeriod ? 'text-ma-terracotta' : 'text-ma-sand/40'}`}
+                        >
+                          <Droplet fill={hasPeriod ? THEME.terracotta : 'transparent'} size={20} />
+                        </button>
                       </div>
-                    )}
-                  </div>
-                );
-              })}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           ) : (
-            <div style={{ maxHeight: '75vh', overflowY: 'auto' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
-                {fullHistory.map(item => (
-                  <div key={item.key} style={{ background: '#fff', padding: '1.5rem', borderRadius: '24px', border: `2px solid ${THEME.sand}` }}>
-                    <h3 style={{ marginTop: 0, color: THEME.plum }}>{item.label}</h3>
-                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                      <thead><tr style={{ color: THEME.rose, fontSize: '0.75rem', textAlign: 'left' }}><th>START</th><th>END</th><th>DAYS</th></tr></thead>
-                      <tbody>
-                        {item.ranges.map((r, i) => (
-                          <tr key={i} style={{ fontSize: '0.9rem' }}><td style={{ padding: '8px 0' }}>{r.start}</td><td style={{ padding: '8px 0' }}>{r.end}</td><td style={{ padding: '8px 0', fontWeight: 'bold', color: THEME.terracotta }}>{r.end - r.start + 1}</td></tr>
-                        ))}
-                      </tbody>
-                    </table>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {fullHistory.map(item => (
+                <div key={item.key} className="bg-white/60 p-8 rounded-[2rem] border border-white shadow-sm">
+                  <h3 className="text-2xl font-serif mb-4">{item.label}</h3>
+                  <div className="space-y-3">
+                    {item.ranges.map((r, idx) => (
+                      <div key={idx} className="flex justify-between items-center bg-white/40 p-4 rounded-2xl border border-white/50">
+                        <span className="text-sm font-medium opacity-60">{r.start} — {r.end}</span>
+                        <span className="bg-ma-terracotta/10 text-ma-terracotta px-3 py-1 rounded-full text-xs font-bold">
+                          {r.end - r.start + 1} Days
+                        </span>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
           )}
-        </section>
+        </div>
 
-        <aside style={{ flex: 1, padding: '2rem', backgroundColor: '#fff', borderRadius: '32px', border: `3px solid ${THEME.sand}`, alignSelf: 'flex-start', marginTop: '68px' }}>
-          <h3 style={{ marginTop: 0, marginBottom: '1.5rem', fontSize: '1.2rem', color: THEME.plum, textAlign: 'center' }}>Mood Palette</h3>
-          {palette.map((item, idx) => (
-            <div key={idx} onClick={() => setActiveMoodIndex(idx)} 
-              style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', borderRadius: '16px', cursor: 'pointer', border: activeMoodIndex === idx ? `3px solid ${THEME.plum}` : `2px solid ${THEME.cream}`, backgroundColor: activeMoodIndex === idx ? THEME.cream : '#fff', marginBottom: '10px' }}>
-              <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: item.color, border: `2px solid ${THEME.sand}`, position: 'relative', overflow: 'hidden' }}>
-                <input type="color" value={item.color} onChange={(e) => { const p = [...palette]; p[idx].color = e.target.value; setPalette(p); }} style={{ position: 'absolute', opacity: 0, cursor: 'pointer', width: '100%', height: '100%' }} />
-              </div>
-              <input type="text" value={item.label} onChange={(e) => { const p = [...palette]; p[idx].label = e.target.value; setPalette(p); }} style={{ border: 'none', background: 'transparent', flex: 1, fontSize: '0.95rem', fontWeight: activeMoodIndex === idx ? '700' : '500', color: THEME.plum, outline: 'none' }} />
+        {/* SIDEBAR SECTION */}
+        <div className="col-span-12 lg:col-span-4 space-y-8 mt-4">
+          {/* MOOD PALETTE BENTO */}
+          <div className="bg-white/60 rounded-[2rem] p-8 border border-white shadow-sm">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-2xl font-serif font-bold">Mood Palette</h3>
+              <Settings2 className="opacity-20 w-5 h-5" />
             </div>
-          ))}
-        </aside>
+            <div className="space-y-3">
+              {palette.map((item, idx) => (
+                <button key={idx} onClick={() => setActiveMoodIndex(idx)}
+                  className={`w-full p-4 rounded-[1.5rem] flex items-center gap-4 border transition-all group
+                  ${activeMoodIndex === idx ? 'bg-white border-ma-plum/10 shadow-md' : 'bg-ma-sand/20 border-transparent hover:bg-white/50'}`}>
+                  <div className="w-4 h-4 rounded-full shadow-inner" style={{ backgroundColor: item.color }} />
+                  <span className={`text-sm font-medium ${activeMoodIndex === idx ? 'opacity-100' : 'opacity-40'}`}>
+                    {item.label}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* CYCLE STATS BENTO (CAPACITY DENSITY STYLE) */}
+          <div className="bg-ma-eggplant text-ma-cream rounded-[2.5rem] p-10 shadow-2xl relative overflow-hidden">
+            <div className="relative z-10">
+              <div className="flex justify-between items-center mb-6">
+                <h4 className="text-[11px] uppercase tracking-[0.4em] opacity-40 font-bold">Cycle Overview</h4>
+                <HelpCircle className="w-5 h-5 opacity-40" />
+              </div>
+
+              <div className="flex items-end gap-3 mb-8">
+                <span className="text-7xl font-serif tracking-tighter">
+                  {averageCycle || '--'}
+                </span>
+                <span className="text-sm uppercase font-bold tracking-widest opacity-40 mb-3">Avg Days</span>
+              </div>
+
+              <div className="w-full bg-white/10 h-2.5 rounded-full overflow-hidden">
+                <div 
+                  className="bg-gradient-to-r from-ma-terracotta to-ma-rose h-full transition-all duration-1000 ease-out" 
+                  style={{ width: averageCycle ? `${(averageCycle / 35) * 100}%` : '0%' }}
+                />
+              </div>
+              <p className="text-[10px] mt-4 opacity-40 font-medium">Calculation based on your logged history.</p>
+            </div>
+          </div>
+        </div>
       </main>
 
-      <footer style={{ padding: '1.5rem 3rem', background: THEME.plum, color: THEME.sand, fontSize: '0.9rem' }}>
-        <div style={{ maxWidth: '1400px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>Personal Health Tracker &copy; 2026</span>
-          <span style={{ fontWeight: '600', backgroundColor: 'rgba(255,255,255,0.1)', padding: '8px 16px', borderRadius: '20px' }}>
-            Avg Cycle: <span style={{ color: THEME.rose, fontWeight: '800', marginLeft: '5px' }}>{averageCycle ? `${averageCycle} Days` : '...'}</span>
-          </span>
-        </div>
+      <footer className="p-8 text-center opacity-30 text-xs tracking-widest uppercase font-bold">
+        Personal Health Tracker &copy; 2026 — Sanctuary for Your Time
       </footer>
     </div>
   );
