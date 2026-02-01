@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
     // Use gemini-2.5-flash (stable model, best price-performance)
     const model = genAI.getGenerativeModel({ 
       model: "gemini-2.5-flash",
-      systemInstruction: "You are a supportive and friendly assistant. Be genuine, respectful, and treat users as capable adults. Keep responses concise and conversational - like chatting with a trusted friend who gets you. Be warm but not condescending. Use exclamation marks and emojis naturally to add warmth and friendliness to your responses! 😊 Feel free to use emojis like 😊, 💪, 🌟, ❤️, 🤗, ✨, 🎉, 💡, 🙌, and others when appropriate. Make your responses feel lively and engaging while still being helpful and practical. IMPORTANT: Focus on making supportive statements and offering helpful suggestions rather than asking lots of questions. Only ask questions when absolutely necessary to understand what the user needs. Prefer to provide affirmations, encouragement, and practical advice. Sound natural and conversational - like you're just chatting, not conducting an interview."
+      systemInstruction: "You are a supportive and friendly assistant. Be conversational and natural - like texting a friend! Keep responses SHORT (1-3 sentences max). Give helpful advice when appropriate, and ask engaging questions to make users feel welcome and involved. Use emojis naturally! 😊 Be warm, genuine, and make people feel heard. Ask thoughtful questions that show you care and want to understand them better. Balance giving advice with asking questions - make it feel like a real conversation where both people are engaged. Sound natural and friendly, not robotic or formal."
     });
 
     // Build conversation history for Gemini
@@ -64,14 +64,37 @@ export async function POST(request: NextRequest) {
     console.error("Error details:", JSON.stringify(error, null, 2));
     
     const errorMessage = error?.message || error?.toString() || "Unknown error occurred";
-    const errorDetails = error?.cause || error?.stack || "";
     
+    // Check for quota/rate limit errors
+    if (errorMessage.includes("429") || errorMessage.includes("quota") || errorMessage.includes("rate limit") || errorMessage.includes("Too Many Requests")) {
+      return NextResponse.json(
+        { 
+          error: "Rate limit exceeded",
+          details: errorMessage,
+          message: "You've reached the daily API limit (20 requests/day on free tier). The limit resets daily. You can:\n\n• Wait for the quota to reset (usually at midnight PST)\n• Upgrade your Google AI Studio plan for higher limits\n• Try again later\n\nSorry for the inconvenience! 😊"
+        },
+        { status: 429 }
+      );
+    }
+    
+    // Check for API key errors
+    if (errorMessage.includes("API key") || errorMessage.includes("401") || errorMessage.includes("403")) {
+      return NextResponse.json(
+        { 
+          error: "API key error",
+          details: errorMessage,
+          message: "There's an issue with your API key. Please check your GEMINI_API_KEY in .env file and restart your dev server."
+        },
+        { status: 401 }
+      );
+    }
+    
+    // Generic error
     return NextResponse.json(
       { 
         error: "Failed to get response from AI",
         details: errorMessage,
-        stack: errorDetails,
-        message: `Error: ${errorMessage}. Please check your GEMINI_API_KEY in .env file and restart your dev server.`
+        message: `Sorry, I encountered an error: ${errorMessage}. Please try again later.`
       },
       { status: 500 }
     );
