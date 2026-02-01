@@ -31,9 +31,11 @@ type CalendarEvent = {
   load: LoadLevel;
   isAllDay: boolean;
   completed: boolean;
+  person: string; // "mom" or kid's name
 };
 
 const STORAGE_KEY = "avecma_calendar_events_v1";
+const KIDS_STORAGE_KEY = "avecma_calendar_kids_v1";
 
 function safeLoadEvents(): CalendarEvent[] {
   if (typeof window === "undefined") return [];
@@ -41,7 +43,12 @@ function safeLoadEvents(): CalendarEvent[] {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    const events = Array.isArray(parsed) ? parsed : [];
+    // Add default "person" field for backward compatibility
+    return events.map((e: any) => ({
+      ...e,
+      person: e.person || "mom",
+    }));
   } catch {
     return [];
   }
@@ -51,6 +58,25 @@ function safeSaveEvents(events: CalendarEvent[]) {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
+  } catch {}
+}
+
+function safeLoadKids(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(KIDS_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function safeSaveKids(kids: string[]) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(KIDS_STORAGE_KEY, JSON.stringify(kids));
   } catch {}
 }
 
@@ -97,6 +123,29 @@ export default function CalendarPage() {
     [],
   );
 
+  // Kids management
+  const [kids, setKids] = useState<string[]>([]);
+  const [isKidsModalOpen, setIsKidsModalOpen] = useState(false);
+  const [newKidName, setNewKidName] = useState("");
+  const [editingKidIndex, setEditingKidIndex] = useState<number | null>(null);
+  const [filterPerson, setFilterPerson] = useState<string | null>(null); // null = all, "mom" = mom only, or kid name
+  const [quickAddPerson, setQuickAddPerson] = useState<string | null>(null); // For quick-add with pre-selected person
+
+  // Load kids on mount
+  useEffect(() => {
+    if (isHydrated) {
+      const loadedKids = safeLoadKids();
+      setKids(loadedKids);
+    }
+  }, [isHydrated]);
+
+  // Save kids when changed
+  useEffect(() => {
+    if (isHydrated) {
+      safeSaveKids(kids);
+    }
+  }, [kids, isHydrated]);
+
   const month = currentDate.getMonth();
   const year = currentDate.getFullYear();
   const daysInMonth = getDaysInMonth(month, year);
@@ -131,6 +180,39 @@ export default function CalendarPage() {
     return "bg-[#A7F3D0]";
   };
 
+  // Color coding for people
+  const getPersonColor = (person: string): string => {
+    if (person === "mom") return "bg-[#D6A5A5]"; // Rose for mom
+    const kidIndex = kids.indexOf(person);
+    const kidColors = [
+      "bg-[#9CAF88]", // Sage green
+      "bg-[#C27664]", // Terracotta
+      "bg-[#9bf6ff]", // Light blue
+      "bg-[#FFD6A5]", // Peach
+      "bg-[#A8D5BA]", // Mint
+    ];
+    return kidColors[kidIndex % kidColors.length] || "bg-[#E0E0E0]";
+  };
+
+  const getPersonBorderColor = (person: string): string => {
+    if (person === "mom") return "border-[#D6A5A5]";
+    const kidIndex = kids.indexOf(person);
+    const kidColors = [
+      "border-[#9CAF88]",
+      "border-[#C27664]",
+      "border-[#9bf6ff]",
+      "border-[#FFD6A5]",
+      "border-[#A8D5BA]",
+    ];
+    return kidColors[kidIndex % kidColors.length] || "border-[#E0E0E0]";
+  };
+
+  // Filter events by person
+  const filteredEvents = useMemo(() => {
+    if (!filterPerson) return events;
+    return events.filter((e) => e.person === filterPerson);
+  }, [events, filterPerson]);
+
   const formatPrettyDate = (yyyyMmDd: string) => {
     const [y, m, d] = yyyyMmDd.split("-").map((x) => parseInt(x, 10));
     const dt = new Date(y, (m || 1) - 1, d || 1);
@@ -158,7 +240,7 @@ export default function CalendarPage() {
   // Derived day events (live)
   const selectedDayEvents = useMemo(() => {
     if (!selectedDay || !isHydrated) return [];
-    return events.filter((e) => e.date === selectedDay);
+    return filteredEvents.filter((e) => e.date === selectedDay);
   }, [events, selectedDay, isHydrated]);
 
   const isDayEmpty = selectedDay ? selectedDayEvents.length === 0 : true;
@@ -220,6 +302,7 @@ export default function CalendarPage() {
       load: ((formData.get("load") as string) || "medium") as LoadLevel,
       isAllDay: true,
       completed: false,
+      person: (formData.get("person") as string) || "mom",
     };
 
     setEvents((prev) => [...prev, newEv]);
@@ -240,7 +323,7 @@ export default function CalendarPage() {
       year: 300,
     };
 
-    const active = events.filter((e) => !e.completed);
+    const active = filteredEvents.filter((e) => !e.completed);
     let filtered = active;
 
     if (capacityMode === "today") {
@@ -261,24 +344,38 @@ export default function CalendarPage() {
       Math.floor((totalWeight / thresholds[capacityMode]) * 100),
       100,
     );
-  }, [events, capacityMode, month, year, todayStr, isHydrated]);
+  }, [filteredEvents, capacityMode, month, year, todayStr, isHydrated]);
 
   // Top priorities list
   const topPriorityItems = useMemo(() => {
     if (!isHydrated) return [];
-    const active = events.filter((e) => !e.completed);
-    const animating = events.filter((e) => priorityAnimatingIds.includes(e.id));
+    const active = filteredEvents.filter((e) => !e.completed);
+    const animating = filteredEvents.filter((e) => priorityAnimatingIds.includes(e.id));
     const merged = [
       ...active,
       ...animating.filter((a) => !active.some((x) => x.id === a.id)),
     ];
     return merged.slice(0, isPriorityExpanded ? 10 : 3);
-  }, [events, priorityAnimatingIds, isPriorityExpanded, isHydrated]);
+  }, [filteredEvents, priorityAnimatingIds, isPriorityExpanded, isHydrated]);
 
   // Today's to-do list - only show incomplete tasks
   const todayTodos = useMemo(() => {
     if (!isHydrated) return [];
-    return events.filter((e) => e.date === todayStr && !e.completed);
+    return filteredEvents.filter((e) => e.date === todayStr && !e.completed);
+  }, [filteredEvents, todayStr, isHydrated]);
+
+  // Tasks grouped by person for today
+  const tasksByPerson = useMemo(() => {
+    if (!isHydrated) return {};
+    const todayEvents = events.filter((e) => e.date === todayStr && !e.completed);
+    const grouped: Record<string, CalendarEvent[]> = {};
+    todayEvents.forEach((event) => {
+      if (!grouped[event.person]) {
+        grouped[event.person] = [];
+      }
+      grouped[event.person].push(event);
+    });
+    return grouped;
   }, [events, todayStr, isHydrated]);
 
   // Anim variants for day cards
@@ -315,7 +412,50 @@ export default function CalendarPage() {
             </p>
           </div>
 
-          <div className="flex gap-3">
+          <div className="flex gap-3 items-center flex-wrap">
+            {/* Filter buttons */}
+            <div className="flex gap-2 bg-white/40 rounded-full p-1 border border-white/40">
+              <button
+                onClick={() => setFilterPerson(null)}
+                className={`px-4 py-2 rounded-full text-sm font-semibold transition-all ${
+                  filterPerson === null
+                    ? "bg-ma-terracotta text-white"
+                    : "opacity-60 hover:opacity-100"
+                }`}
+              >
+                All
+              </button>
+              <button
+                onClick={() => setFilterPerson("mom")}
+                className={`px-4 py-2 rounded-full text-sm font-semibold transition-all ${
+                  filterPerson === "mom"
+                    ? "bg-[#D6A5A5] text-white"
+                    : "opacity-60 hover:opacity-100"
+                }`}
+              >
+                Mom
+              </button>
+              {kids.map((kid) => (
+                <button
+                  key={kid}
+                  onClick={() => setFilterPerson(kid)}
+                  className={`px-4 py-2 rounded-full text-sm font-semibold transition-all ${
+                    filterPerson === kid
+                      ? `${getPersonColor(kid)} text-white`
+                      : "opacity-60 hover:opacity-100"
+                  }`}
+                >
+                  {kid}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setIsKidsModalOpen(true)}
+              className="px-4 py-2 rounded-full bg-white/40 hover:bg-white border border-white/40 shadow-sm transition-all text-sm font-semibold"
+              title="Manage kids"
+            >
+              👶 Manage Kids
+            </button>
             <button
               onClick={undo}
               disabled={past.length === 0}
@@ -384,7 +524,7 @@ export default function CalendarPage() {
                 const dayNum = i + 1;
                 const dateObj = new Date(year, month, dayNum);
                 const dateString = dateObj.toISOString().split("T")[0];
-                const dayEvents = isHydrated ? events.filter((e) => e.date === dateString) : [];
+                const dayEvents = isHydrated ? filteredEvents.filter((e) => e.date === dateString) : [];
                 const isToday = dateString === todayStr;
 
                 return (
@@ -412,10 +552,8 @@ export default function CalendarPage() {
                         {dayEvents.map((e) => (
                           <div
                             key={e.id}
-                            title={e.title}
-                            className={`w-2.5 h-2.5 rounded-full ${getSoftColor(
-                              e.load,
-                            )} ${
+                            title={`${e.person === "mom" ? "Mom" : e.person}: ${e.title}`}
+                            className={`w-2.5 h-2.5 rounded-full ${getPersonColor(e.person)} border-2 ${getPersonBorderColor(e.person)} ${
                               e.completed
                                 ? "ring-1 ring-ma-eggplant/40 opacity-70"
                                 : ""
@@ -480,20 +618,28 @@ export default function CalendarPage() {
                         >
                           <div className="flex items-center gap-4 text-left">
                             <div
+                              className={`w-3 h-3 rounded-full border ${getPersonColor(event.person)} ${getPersonBorderColor(event.person)}`}
+                            />
+                            <div
                               className={`w-3 h-3 rounded-full ${getSoftColor(
                                 event.load,
                               )}`}
                             />
                             <div className="flex flex-col">
-                              <span
-                                className={`font-medium transition-all ${
-                                  showCompletedStyle
-                                    ? "line-through opacity-50"
-                                    : ""
-                                }`}
-                              >
-                                {event.title}
-                              </span>
+                              <div className="flex items-center gap-2">
+                                <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${getPersonColor(event.person)} text-white`}>
+                                  {event.person === "mom" ? "Mom" : event.person}
+                                </span>
+                                <span
+                                  className={`font-medium transition-all ${
+                                    showCompletedStyle
+                                      ? "line-through opacity-50"
+                                      : ""
+                                  }`}
+                                >
+                                  {event.title}
+                                </span>
+                              </div>
                               <span className="text-[10px] opacity-40 uppercase tracking-widest">
                                 {event.date}
                               </span>
@@ -570,7 +716,7 @@ export default function CalendarPage() {
               </div>
             </div>
 
-            {/* To Do for Today */}
+            {/* To Do for Today - Grouped by Person */}
             <div className="bg-white/80 rounded-[2rem] p-8 border border-white shadow-sm backdrop-blur-sm">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
@@ -588,14 +734,24 @@ export default function CalendarPage() {
                 </button>
               </div>
 
-              <div className="space-y-3 max-h-[400px] overflow-y-auto">
+              <div className="space-y-6 max-h-[400px] overflow-y-auto">
                 <AnimatePresence initial={false}>
-                  {todayTodos.length === 0 ? (
+                  {Object.keys(tasksByPerson).length === 0 ? (
                     <div className="text-sm opacity-60 italic text-center py-8 bg-white/40 rounded-[1.5rem] p-4">
                       No tasks for today. Enjoy your day! ✨
                     </div>
                   ) : (
-                    todayTodos.map((event) => {
+                    // Show tasks grouped by person
+                    Object.entries(tasksByPerson).map(([person, personTasks]) => (
+                      <div key={person} className="space-y-3">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className={`w-4 h-4 rounded-full ${getPersonColor(person)} border-2 ${getPersonBorderColor(person)}`} />
+                          <h4 className="font-bold text-ma-eggplant text-sm">
+                            {person === "mom" ? "Mom's Tasks" : `${person}'s Tasks`}
+                          </h4>
+                          <span className="text-xs opacity-50">({personTasks.length})</span>
+                        </div>
+                        {personTasks.map((event) => {
                       const isCompleting = priorityAnimatingIds.includes(event.id);
                       const showCompletedStyle = event.completed || isCompleting;
 
@@ -632,6 +788,12 @@ export default function CalendarPage() {
                             <div className="flex-1 text-left min-w-0">
                               <div className="flex items-center gap-2 mb-1">
                                 <div
+                                  className={`w-2 h-2 rounded-full flex-shrink-0 ${getPersonColor(event.person)} border ${getPersonBorderColor(event.person)}`}
+                                />
+                                <span className={`text-xs font-semibold px-2 py-0.5 rounded ${getPersonColor(event.person)} text-white`}>
+                                  {event.person === "mom" ? "Mom" : event.person}
+                                </span>
+                                <div
                                   className={`w-2 h-2 rounded-full flex-shrink-0 ${getSoftColor(
                                     event.load,
                                   )}`}
@@ -654,7 +816,9 @@ export default function CalendarPage() {
                           </button>
                         </motion.div>
                       );
-                    })
+                    })}
+                      </div>
+                    ))
                   )}
                 </AnimatePresence>
               </div>
@@ -787,9 +951,14 @@ export default function CalendarPage() {
                               {event.title}
                             </motion.h3>
 
-                            <p className="relative z-10 text-ma-plum/60 text-sm mb-6">
-                              {event.time} • {event.load.toUpperCase()} LOAD
-                            </p>
+                            <div className="relative z-10 flex items-center justify-center gap-2 mb-6">
+                              <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getPersonColor(event.person)} text-white`}>
+                                {event.person === "mom" ? "Mom" : event.person}
+                              </span>
+                              <span className="text-ma-plum/60 text-sm">
+                                {event.time} • {event.load.toUpperCase()} LOAD
+                              </span>
+                            </div>
 
                             {event.desc && (
                               <p className="relative z-10 text-ma-plum/80 text-sm mb-10 italic">
@@ -918,6 +1087,52 @@ export default function CalendarPage() {
                     </div>
                   </div>
 
+                  {/* Person Selector */}
+                  <div className="space-y-2 pt-4">
+                    <label className="text-[10px] font-bold opacity-30 uppercase tracking-widest ml-1">
+                      For
+                    </label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <label className="cursor-pointer">
+                        <input
+                          type="radio"
+                          name="person"
+                          value="mom"
+                          defaultChecked
+                          className="peer sr-only"
+                        />
+                        <div className="p-4 text-center rounded-[1.2rem] opacity-40 peer-checked:opacity-100 peer-checked:ring-2 ring-ma-eggplant ring-offset-4 transition-all bg-[#D6A5A5] text-white text-sm font-bold">
+                          Mom
+                        </div>
+                      </label>
+                      {kids.map((kid) => (
+                        <label key={kid} className="cursor-pointer">
+                          <input
+                            type="radio"
+                            name="person"
+                            value={kid}
+                            className="peer sr-only"
+                          />
+                          <div className={`p-4 text-center rounded-[1.2rem] opacity-40 peer-checked:opacity-100 peer-checked:ring-2 ring-ma-eggplant ring-offset-4 transition-all ${getPersonColor(kid)} text-white text-sm font-bold`}>
+                            {kid}
+                          </div>
+                        </label>
+                      ))}
+                      {kids.length === 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsAddModalOpen(false);
+                            setIsKidsModalOpen(true);
+                          }}
+                          className="p-4 text-center rounded-[1.2rem] border-2 border-dashed border-ma-plum/30 text-ma-plum/60 text-sm font-bold hover:border-ma-plum/60 hover:text-ma-plum transition-all"
+                        >
+                          + Add Kid
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
                   <div className="grid grid-cols-3 gap-4 pt-4">
                     {(["heavy", "medium", "light"] as const).map((l) => (
                       <label key={l} className="cursor-pointer">
@@ -1006,6 +1221,52 @@ export default function CalendarPage() {
                       rows={2}
                       className="w-full p-5 bg-ma-sand/10 rounded-[1.2rem] outline-none"
                     />
+                  </div>
+
+                  {/* Person Selector */}
+                  <div className="space-y-2 pt-4">
+                    <label className="text-[10px] font-bold opacity-30 uppercase tracking-widest ml-1">
+                      For
+                    </label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <label className="cursor-pointer">
+                        <input
+                          type="radio"
+                          name="person"
+                          value="mom"
+                          defaultChecked
+                          className="peer sr-only"
+                        />
+                        <div className="p-4 text-center rounded-[1.2rem] opacity-40 peer-checked:opacity-100 peer-checked:ring-2 ring-ma-eggplant ring-offset-4 transition-all bg-[#D6A5A5] text-white text-sm font-bold">
+                          Mom
+                        </div>
+                      </label>
+                      {kids.map((kid) => (
+                        <label key={kid} className="cursor-pointer">
+                          <input
+                            type="radio"
+                            name="person"
+                            value={kid}
+                            className="peer sr-only"
+                          />
+                          <div className={`p-4 text-center rounded-[1.2rem] opacity-40 peer-checked:opacity-100 peer-checked:ring-2 ring-ma-eggplant ring-offset-4 transition-all ${getPersonColor(kid)} text-white text-sm font-bold`}>
+                            {kid}
+                          </div>
+                        </label>
+                      ))}
+                      {kids.length === 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsAddTodayTaskOpen(false);
+                            setIsKidsModalOpen(true);
+                          }}
+                          className="p-4 text-center rounded-[1.2rem] border-2 border-dashed border-ma-plum/30 text-ma-plum/60 text-sm font-bold hover:border-ma-plum/60 hover:text-ma-plum transition-all"
+                        >
+                          + Add Kid
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-3 gap-4 pt-4">
@@ -1097,6 +1358,145 @@ export default function CalendarPage() {
                 >
                   Understood
                 </button>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* KIDS MANAGEMENT MODAL */}
+        <AnimatePresence>
+          {isKidsModalOpen && (
+            <motion.div
+              className="fixed inset-0 bg-ma-eggplant/60 backdrop-blur-sm z-[200] flex items-center justify-center p-6"
+              onClick={() => setIsKidsModalOpen(false)}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
+              <motion.div
+                className="bg-white p-12 rounded-[3rem] max-w-md w-full shadow-2xl relative border border-ma-sand/20"
+                onClick={(e) => e.stopPropagation()}
+                initial={{ y: 18, opacity: 0, scale: 0.98 }}
+                animate={{ y: 0, opacity: 1, scale: 1 }}
+                exit={{ y: 18, opacity: 0, scale: 0.98 }}
+                transition={{ duration: 0.22 }}
+              >
+                <button
+                  type="button"
+                  onClick={() => setIsKidsModalOpen(false)}
+                  className="absolute top-8 right-8 rounded-full p-3 hover:bg-ma-sand/30 transition-all"
+                  aria-label="Close"
+                >
+                  <X className="w-6 h-6 opacity-30 hover:opacity-100 transition-opacity" />
+                </button>
+
+                <h3 className="text-3xl font-serif mb-6 text-ma-eggplant tracking-tight">
+                  Manage Kids
+                </h3>
+
+                <div className="space-y-4 mb-6">
+                  {kids.map((kid, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center gap-3 p-4 bg-ma-sand/20 rounded-[1.5rem] border border-white"
+                    >
+                      <div
+                        className={`w-8 h-8 rounded-full flex-shrink-0 ${getPersonColor(kid)} border-2 ${getPersonBorderColor(kid)}`}
+                      />
+                      {editingKidIndex === index ? (
+                        <input
+                          type="text"
+                          value={newKidName}
+                          onChange={(e) => setNewKidName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              const updated = [...kids];
+                              updated[index] = newKidName.trim();
+                              setKids(updated);
+                              setEditingKidIndex(null);
+                              setNewKidName("");
+                            } else if (e.key === "Escape") {
+                              setEditingKidIndex(null);
+                              setNewKidName("");
+                            }
+                          }}
+                          className="flex-1 p-2 bg-white rounded-lg border border-ma-plum/20 outline-none focus:border-ma-plum/40"
+                          autoFocus
+                        />
+                      ) : (
+                        <>
+                          <span className="flex-1 font-semibold text-ma-eggplant">
+                            {kid}
+                          </span>
+                          <button
+                            onClick={() => {
+                              setEditingKidIndex(index);
+                              setNewKidName(kid);
+                            }}
+                            className="px-3 py-1 text-xs font-semibold text-ma-plum hover:bg-white rounded-lg transition-all"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => {
+                              setKids(kids.filter((_, i) => i !== index));
+                              // Update events to remove this kid's name
+                              setEvents((prev) =>
+                                prev.map((e) =>
+                                  e.person === kid ? { ...e, person: "mom" } : e
+                                )
+                              );
+                            }}
+                            className="px-3 py-1 text-xs font-semibold text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                          >
+                            Remove
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="space-y-3">
+                  <input
+                    type="text"
+                    value={newKidName}
+                    onChange={(e) => setNewKidName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && newKidName.trim()) {
+                        if (editingKidIndex !== null) {
+                          const updated = [...kids];
+                          updated[editingKidIndex] = newKidName.trim();
+                          setKids(updated);
+                          setEditingKidIndex(null);
+                        } else {
+                          setKids([...kids, newKidName.trim()]);
+                        }
+                        setNewKidName("");
+                      }
+                    }}
+                    placeholder="Enter kid's name"
+                    className="w-full p-4 bg-ma-sand/10 rounded-[1.5rem] outline-none focus:border-2 focus:border-ma-plum/40 border border-transparent"
+                  />
+                  <button
+                    onClick={() => {
+                      if (newKidName.trim()) {
+                        if (editingKidIndex !== null) {
+                          const updated = [...kids];
+                          updated[editingKidIndex] = newKidName.trim();
+                          setKids(updated);
+                          setEditingKidIndex(null);
+                        } else {
+                          setKids([...kids, newKidName.trim()]);
+                        }
+                        setNewKidName("");
+                      }
+                    }}
+                    className="w-full bg-ma-terracotta text-white py-4 rounded-full font-bold uppercase tracking-widest hover:brightness-105 transition-all"
+                  >
+                    {editingKidIndex !== null ? "Update" : "Add Kid"}
+                  </button>
+                </div>
               </motion.div>
             </motion.div>
           )}
