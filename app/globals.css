@@ -1,28 +1,31 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f9f7f2; /* ma-cream */
+  --foreground: #2d1b2d; /* ma-eggplant */
 }
 
 @theme inline {
+  /* "Avec Ma" Palette Registration */
+  --color-ma-eggplant: #2d1b2d;
+  --color-ma-plum: #4a2e45;
+  --color-ma-cream: #f9f7f2;
+  --color-ma-rose: #d6a5a5;
+  --color-ma-sage: #9caf88;
+  --color-ma-terracotta: #c27664;
+  --color-ma-sand: #eae2d6;
+
+  /* Custom "Soft" Border Radius */
+  --radius-ma: 3.5rem;
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
 }
 
 @keyframes bounce {
