@@ -63,8 +63,8 @@ export default function ProfilePictureEditor({
           <img
             src={preview}
             alt={userName || "User"}
-            width={80}
-            height={80}
+            width={120}
+            height={120}
             style={{
               borderRadius: "50%",
               boxShadow: "0 4px 12px rgba(97, 64, 81, 0.3)",
@@ -87,8 +87,8 @@ export default function ProfilePictureEditor({
           <Image
             src={preview}
             alt={userName || "User"}
-            width={80}
-            height={80}
+            width={120}
+            height={120}
             style={{
               borderRadius: "50%",
               boxShadow: "0 4px 12px rgba(97, 64, 81, 0.3)",
@@ -111,15 +111,15 @@ export default function ProfilePictureEditor({
         <div
           onClick={handleClick}
           style={{
-            width: "80px",
-            height: "80px",
+            width: "120px",
+            height: "120px",
             borderRadius: "50%",
             backgroundColor: "#614051",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             color: "white",
-            fontSize: "2rem",
+            fontSize: "3rem",
             fontWeight: "600",
             boxShadow: "0 4px 12px rgba(97, 64, 81, 0.3)",
             cursor: "pointer",
@@ -145,8 +145,8 @@ export default function ProfilePictureEditor({
           position: "absolute",
           bottom: "0",
           right: "0",
-          width: "28px",
-          height: "28px",
+          width: "36px",
+          height: "36px",
           borderRadius: "50%",
           backgroundColor: "#614051",
           border: "2px solid white",
@@ -167,8 +167,8 @@ export default function ProfilePictureEditor({
         }}
       >
         <svg
-          width="14"
-          height="14"
+          width="18"
+          height="18"
           viewBox="0 0 24 24"
           fill="none"
           stroke="white"

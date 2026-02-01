@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
   try {
-    const { message, history } = await request.json();
+    const { message, history, therapist } = await request.json();
 
     if (!message) {
       return NextResponse.json(
@@ -23,24 +23,46 @@ export async function POST(request: NextRequest) {
 
     console.log("API Key exists:", !!apiKey);
     console.log("Message received:", message);
+    console.log("Therapist selected:", therapist?.name || "None");
     
     const genAI = new GoogleGenerativeAI(apiKey);
+    
+    // Use therapist personality if selected, otherwise use default
+    const systemInstruction = therapist?.personality 
+      ? `${therapist.personality} Be conversational and natural - like texting a friend! Keep responses SHORT (1-3 sentences max). Use emojis naturally! 😊`
+      : "You are a supportive and friendly assistant. Be conversational and natural - like texting a friend! Keep responses SHORT (1-3 sentences max). Give helpful advice when appropriate, and ask engaging questions to make users feel welcome and involved. Use emojis naturally! 😊 Be warm, genuine, and make people feel heard. Ask thoughtful questions that show you care and want to understand them better. Balance giving advice with asking questions - make it feel like a real conversation where both people are engaged. Sound natural and friendly, not robotic or formal.";
     
     // Use gemini-2.5-flash (stable model, best price-performance)
     const model = genAI.getGenerativeModel({ 
       model: "gemini-2.5-flash",
-      systemInstruction: "You are a supportive and friendly assistant. Be conversational and natural - like texting a friend! Keep responses SHORT (1-3 sentences max). Give helpful advice when appropriate, and ask engaging questions to make users feel welcome and involved. Use emojis naturally! 😊 Be warm, genuine, and make people feel heard. Ask thoughtful questions that show you care and want to understand them better. Balance giving advice with asking questions - make it feel like a real conversation where both people are engaged. Sound natural and friendly, not robotic or formal."
+      systemInstruction: systemInstruction
     });
 
     // Build conversation history for Gemini
     let chatHistory: any[] = [];
     if (history && Array.isArray(history) && history.length > 0) {
-      // Filter out the welcome message and only include actual conversation
+      // Filter out welcome/initial assistant messages
       const filteredHistory = history.filter((msg: { role: string; content: string }) => 
-        !msg.content.includes("Welcome") && !msg.content.includes("village is here")
+        msg.role === "user" || 
+        (msg.role === "assistant" && 
+         !msg.content.includes("Welcome") && 
+         !msg.content.includes("village is here") &&
+         !msg.content.includes("I'm here to support you"))
       );
       
-      chatHistory = filteredHistory.map((msg: { role: string; content: string }) => ({
+      // Find first user message and start history from there
+      let startIndex = 0;
+      for (let i = 0; i < filteredHistory.length; i++) {
+        if (filteredHistory[i].role === "user") {
+          startIndex = i;
+          break;
+        }
+      }
+      
+      // Build history starting from first user message
+      const validHistory = filteredHistory.slice(startIndex);
+      
+      chatHistory = validHistory.map((msg: { role: string; content: string }) => ({
         role: msg.role === "user" ? "user" : "model",
         parts: [{ text: msg.content }],
       }));

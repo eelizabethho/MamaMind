@@ -122,6 +122,55 @@ const renderMarkdown = (text: string) => {
   return finalResult.length > 0 ? finalResult : [text];
 };
 
+interface Therapist {
+  id: string;
+  name: string;
+  gender: "male" | "female";
+  style: string;
+  personality: string;
+}
+
+const therapists: Therapist[] = [
+  {
+    id: "sarah",
+    name: "Sarah",
+    gender: "female",
+    style: "Warm and nurturing",
+    personality: "You are Sarah, a warm and nurturing therapist. You're empathetic, gentle, and create a safe space. You use lots of validation and encouragement. You're like a caring friend who always knows the right thing to say."
+  },
+  {
+    id: "maya",
+    name: "Maya",
+    gender: "female",
+    style: "Direct and empowering",
+    personality: "You are Maya, a direct and empowering therapist. You're honest, practical, and help people find their strength. You give actionable advice and challenge people gently. You're confident and help people feel capable."
+  },
+  {
+    id: "james",
+    name: "James",
+    gender: "male",
+    style: "Calm and analytical",
+    personality: "You are James, a calm and analytical therapist. You're thoughtful, logical, and help people process their thoughts. You ask insightful questions and help people see things from different angles. You're steady and reassuring."
+  },
+  {
+    id: "david",
+    name: "David",
+    gender: "male",
+    style: "Supportive and encouraging",
+    personality: "You are David, a supportive and encouraging therapist. You're positive, uplifting, and help people see possibilities. You celebrate small wins and help people build confidence. You're like a supportive coach who believes in people."
+  }
+];
+
+interface PastChat {
+  id: string;
+  summary: string;
+  timestamp: Date;
+  therapistName?: string;
+  messageCount: number;
+  messages: Message[]; // Store full conversation
+  therapistId?: string; // Store therapist ID to restore selection
+}
+
 export default function Page() {
   const { data: session } = useSession();
   const [messages, setMessages] = useState<Message[]>([
@@ -132,9 +181,14 @@ export default function Page() {
   ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedQuickAction, setSelectedQuickAction] = useState<string | null>(null);
+  const [selectedTherapist, setSelectedTherapist] = useState<Therapist | null>(null);
   const [customProfileImage, setCustomProfileImage] = useState<string | null>(null);
+  const [pastChats, setPastChats] = useState<PastChat[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const conversationStartTime = useRef<Date>(new Date());
 
   // Load custom profile image from localStorage (same as Sidebar)
   useEffect(() => {
@@ -149,12 +203,103 @@ export default function Page() {
   // Use custom image if available, otherwise use Google image
   const displayImage = customProfileImage || session?.user?.image || null;
 
+  // Load past chats from localStorage
+  useEffect(() => {
+    if (session?.user?.email) {
+      const savedChats = localStorage.getItem(`past_chats_${session.user.email}`);
+      if (savedChats) {
+        try {
+          const chats = JSON.parse(savedChats);
+          setPastChats(chats.map((chat: any) => ({
+            ...chat,
+            timestamp: new Date(chat.timestamp),
+            messages: chat.messages || [], // Ensure messages array exists
+          })));
+        } catch (e) {
+          console.error("Error loading past chats:", e);
+        }
+      }
+    }
+  }, [session?.user?.email]);
+
+  // Save conversation when therapist changes or conversation ends
+  const saveConversation = (messages: Message[]) => {
+    if (messages.length <= 1 || !session?.user?.email) return; // Don't save if only welcome message
+    
+    // Generate summary from first user message
+    const firstUserMessage = messages.find(m => m.role === "user");
+    const summary = firstUserMessage 
+      ? (firstUserMessage.content.length > 60 
+          ? firstUserMessage.content.substring(0, 60) + "..." 
+          : firstUserMessage.content)
+      : "Chat conversation";
+
+    const newChat: PastChat = {
+      id: Date.now().toString(),
+      summary,
+      timestamp: conversationStartTime.current,
+      therapistName: selectedTherapist?.name,
+      messageCount: messages.filter(m => m.role !== "assistant" || !m.content.includes("Welcome")).length,
+      messages: messages, // Store full conversation
+      therapistId: selectedTherapist?.id, // Store therapist ID
+    };
+
+    const updatedChats = [newChat, ...pastChats].slice(0, 10); // Keep last 10 chats
+    setPastChats(updatedChats);
+    
+    // Save to localStorage
+    localStorage.setItem(`past_chats_${session.user.email}`, JSON.stringify(updatedChats));
+  };
+
+  // Load a past chat conversation
+  const loadChat = (chatId: string) => {
+    const chat = pastChats.find(c => c.id === chatId);
+    if (!chat) return;
+
+    // Restore messages
+    setMessages(chat.messages);
+    
+    // Restore therapist selection if applicable
+    if (chat.therapistId) {
+      const therapist = therapists.find((t: Therapist) => t.id === chat.therapistId);
+      if (therapist) {
+        setSelectedTherapist(therapist);
+      }
+    } else {
+      setSelectedTherapist(null);
+    }
+    
+    // Reset conversation start time
+    conversationStartTime.current = chat.timestamp;
+    setSelectedQuickAction(null);
+  };
+
+  // Delete a past chat
+  const deleteChat = (chatId: string) => {
+    if (!session?.user?.email) return;
+    
+    const updatedChats = pastChats.filter(c => c.id !== chatId);
+    setPastChats(updatedChats);
+    
+    // Save to localStorage
+    localStorage.setItem(`past_chats_${session.user.email}`, JSON.stringify(updatedChats));
+  };
+
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+    }
   };
 
   useEffect(() => {
-    scrollToBottom();
+    // Only scroll the messages container when new assistant message arrives
+    // This only scrolls within the chat container, not the whole page
+    if (messages.length > 0 && messages[messages.length - 1].role === "assistant") {
+      // Small delay to ensure DOM is updated
+      setTimeout(() => {
+        scrollToBottom();
+      }, 50);
+    }
   }, [messages]);
 
   useEffect(() => {
@@ -167,6 +312,24 @@ export default function Page() {
   const sendMessage = async (content?: string) => {
     const messageContent = content || input.trim();
     if (!messageContent || isLoading) return;
+
+    // Update selected quick action if it's a prompt message
+    const prompts = [
+      "How are you feeling today?",
+      "What's on your mind?",
+      "I'm feeling overwhelmed",
+      "I need help processing something",
+      "Let's talk about my day",
+      "I need a break",
+      "Help with mind planning",
+      "Connect me to my village",
+      "Check in"
+    ];
+    if (prompts.includes(messageContent)) {
+      setSelectedQuickAction(messageContent);
+    } else {
+      setSelectedQuickAction(null);
+    }
 
     const userMessage: Message = { role: "user", content: messageContent };
     setMessages((prev) => [...prev, userMessage]);
@@ -183,6 +346,11 @@ export default function Page() {
             role: m.role,
             content: m.content,
           })),
+          therapist: selectedTherapist ? {
+            id: selectedTherapist.id,
+            name: selectedTherapist.name,
+            personality: selectedTherapist.personality,
+          } : null,
         }),
       });
 
@@ -269,7 +437,7 @@ export default function Page() {
           minHeight: "100vh",
           display: "flex",
           flexDirection: "column",
-          backgroundColor: "#f5f5f0",
+          background: "linear-gradient(180deg, #ECE0DA 0%, #F1C8CB 50%, #ECE0DA 100%)",
         }}
       >
       <Navbar />
@@ -282,7 +450,58 @@ export default function Page() {
           height: "calc(100vh - 80px)",
         }}
       >
-        <Sidebar />
+        <Sidebar 
+          onQuickActionClick={(action) => sendMessage(action)} 
+          selectedAction={selectedQuickAction}
+          onTherapistSelect={(therapist) => {
+            // Save current conversation before switching
+            if (messages.length > 1) {
+              saveConversation(messages);
+            }
+            
+            setSelectedTherapist(therapist);
+            conversationStartTime.current = new Date();
+            
+            // Reset messages when therapist changes
+            if (therapist) {
+              setMessages([{
+                role: "assistant",
+                content: `Hi! I'm ${therapist.name}, ${therapist.style.toLowerCase()}. I'm here to support you. What would you like to talk about today?`,
+              }]);
+            } else {
+              setMessages([{
+                role: "assistant",
+                content: "Welcome! Your village is here to help. How can I assist you today?",
+              }]);
+            }
+          }}
+          selectedTherapist={selectedTherapist}
+          pastChats={pastChats}
+          onNewChat={() => {
+            // Save current conversation before starting new one
+            if (messages.length > 1) {
+              saveConversation(messages);
+            }
+            
+            // Start fresh chat
+            conversationStartTime.current = new Date();
+            setSelectedQuickAction(null);
+            
+            if (selectedTherapist) {
+              setMessages([{
+                role: "assistant",
+                content: `Hi! I'm ${selectedTherapist.name}, ${selectedTherapist.style.toLowerCase()}. I'm here to support you. What would you like to talk about today?`,
+              }]);
+            } else {
+              setMessages([{
+                role: "assistant",
+                content: "Welcome! Your village is here to help. How can I assist you today?",
+              }]);
+            }
+          }}
+          onChatSelect={loadChat}
+          onChatDelete={deleteChat}
+        />
 
         {/* Chat Container */}
         <div
@@ -299,44 +518,53 @@ export default function Page() {
             style={{
               width: "100%",
               maxWidth: "900px",
-              backgroundColor: "#ece8d5",
-              borderRadius: "16px",
-              boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)",
+              backgroundColor: "#ECE0DA",
+              borderRadius: "20px",
+              boxShadow: "0 4px 20px rgba(0, 0, 0, 0.08)",
               display: "flex",
               flexDirection: "column",
               overflow: "hidden",
               minHeight: "80vh",
+              border: "1px solid rgba(126, 140, 105, 0.1)",
             }}
           >
             {/* Welcome Header */}
             <div
               style={{
-                padding: "1.5rem",
+                padding: "2.5rem 1.5rem",
                 textAlign: "center",
+                background: "linear-gradient(135deg, rgba(246, 176, 187, 0.3) 0%, rgba(241, 200, 203, 0.2) 50%, rgba(236, 224, 218, 0.3) 100%)",
+                borderBottom: "2px solid rgba(126, 140, 105, 0.15)",
+                backdropFilter: "blur(10px)",
               }}
             >
               <h1
                 style={{
-                  fontSize: "1.5rem",
-                  fontWeight: "bold",
+                  fontSize: "1.75rem",
+                  fontWeight: "600",
                   color: "#2d3748",
                   margin: 0,
+                  letterSpacing: "-0.02em",
+                  lineHeight: "1.4",
                 }}
               >
-                Welcome, Your Village Is Here To Help
+                {session?.user?.name 
+                  ? `Welcome ${session.user.name.split(" ")[0]}, how are you today?`
+                  : "Welcome, how are you today?"}
               </h1>
             </div>
 
             {/* Messages Area */}
             <div
+              ref={messagesContainerRef}
               style={{
                 flex: 1,
                 overflowY: "auto",
-                padding: "1.5rem",
+                padding: "2rem 1.75rem",
                 display: "flex",
                 flexDirection: "column",
-                gap: "1.25rem",
-                backgroundColor: "#ece8d5",
+                gap: "1.5rem",
+                background: "linear-gradient(180deg, rgba(236, 224, 218, 0.5) 0%, rgba(255, 255, 255, 0.8) 100%)",
                 scrollBehavior: "smooth",
               }}
             >
@@ -354,20 +582,21 @@ export default function Page() {
                   {message.role === "assistant" && (
                     <div
                       style={{
-                        width: "40px",
-                        height: "40px",
+                        width: "44px",
+                        height: "44px",
                         borderRadius: "50%",
-                        backgroundColor: "#9f7aea",
+                        backgroundColor: "#7E8C69",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
                         flexShrink: 0,
-                        boxShadow: "0 2px 4px rgba(159, 122, 234, 0.2)",
+                        boxShadow: "0 2px 8px rgba(126, 140, 105, 0.25)",
+                        border: "2px solid rgba(255, 255, 255, 0.3)",
                       }}
                     >
                       <svg
-                        width="20"
-                        height="20"
+                        width="22"
+                        height="22"
                         viewBox="0 0 24 24"
                         fill="none"
                         stroke="white"
@@ -381,19 +610,23 @@ export default function Page() {
                   )}
                   <div
                     style={{
-                      backgroundColor: message.role === "user" ? "#9f7aea" : "#f7fafc",
-                      padding: "0.875rem 1.125rem",
-                      borderRadius: message.role === "user" ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
+                        background: message.role === "user" 
+                          ? "linear-gradient(135deg, #7E8C69 0%, #9CAD8C 100%)" 
+                          : "linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.9) 100%)",
+                      padding: "1.25rem 1.5rem",
+                      borderRadius: message.role === "user" ? "24px 24px 8px 24px" : "24px 24px 24px 8px",
+                      backdropFilter: "blur(10px)",
                       maxWidth: "75%",
                       color: message.role === "user" ? "white" : "#2d3748",
-                      fontSize: "0.95rem",
-                      lineHeight: "1.6",
+                      fontSize: "1rem",
+                      lineHeight: "1.65",
                       wordWrap: "break-word",
                       whiteSpace: "pre-wrap",
                       boxShadow: message.role === "user" 
-                        ? "0 2px 8px rgba(159, 122, 234, 0.15)" 
-                        : "0 1px 3px rgba(0, 0, 0, 0.08)",
+                        ? "0 4px 12px rgba(126, 140, 105, 0.2)" 
+                        : "0 2px 8px rgba(0, 0, 0, 0.06)",
                       transition: "all 0.2s ease",
+                      border: message.role === "assistant" ? "1px solid rgba(126, 140, 105, 0.1)" : "none",
                     }}
                   >
                     {renderMarkdown(message.content)}
@@ -401,16 +634,17 @@ export default function Page() {
                   {message.role === "user" && (
                     <div
                       style={{
-                        width: "40px",
-                        height: "40px",
+                        width: "44px",
+                        height: "44px",
                         borderRadius: "50%",
-                        backgroundColor: "#90cdf4",
+                        backgroundColor: "#7E8C69",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
                         flexShrink: 0,
-                        boxShadow: "0 2px 4px rgba(144, 205, 244, 0.2)",
+                        boxShadow: "0 2px 8px rgba(126, 140, 105, 0.25)",
                         overflow: "hidden",
+                        border: "2px solid rgba(255, 255, 255, 0.3)",
                       }}
                     >
                       {displayImage ? (
@@ -452,20 +686,21 @@ export default function Page() {
                 >
                   <div
                     style={{
-                      width: "40px",
-                      height: "40px",
+                      width: "44px",
+                      height: "44px",
                       borderRadius: "50%",
-                      backgroundColor: "#9f7aea",
+                      backgroundColor: "#7E8C69",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
                       flexShrink: 0,
-                      boxShadow: "0 2px 4px rgba(159, 122, 234, 0.2)",
+                      boxShadow: "0 2px 8px rgba(126, 140, 105, 0.25)",
+                      border: "2px solid rgba(255, 255, 255, 0.3)",
                     }}
                   >
                     <svg
-                      width="20"
-                      height="20"
+                      width="22"
+                      height="22"
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke="white"
@@ -478,36 +713,37 @@ export default function Page() {
                   </div>
                   <div
                     style={{
-                      backgroundColor: "#f7fafc",
-                      padding: "0.875rem 1.125rem",
-                      borderRadius: "18px 18px 18px 4px",
+                      backgroundColor: "#ffffff",
+                      padding: "1rem 1.25rem",
+                      borderRadius: "20px 20px 20px 6px",
                       color: "#2d3748",
-                      fontSize: "0.95rem",
-                      boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)",
+                      fontSize: "1rem",
+                      boxShadow: "0 2px 8px rgba(0, 0, 0, 0.06)",
+                      border: "1px solid rgba(126, 140, 105, 0.1)",
                     }}
                   >
-                    <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                    <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
                       <span style={{ 
-                        width: "8px", 
-                        height: "8px", 
+                        width: "10px", 
+                        height: "10px", 
                         borderRadius: "50%", 
-                        backgroundColor: "#9f7aea",
+                        backgroundColor: "#7E8C69",
                         animation: "pulse 1.4s ease-in-out infinite",
                         display: "inline-block",
                       }} />
                       <span style={{ 
-                        width: "8px", 
-                        height: "8px", 
+                        width: "10px", 
+                        height: "10px", 
                         borderRadius: "50%", 
-                        backgroundColor: "#9f7aea",
+                        backgroundColor: "#7E8C69",
                         animation: "pulse 1.4s ease-in-out infinite 0.2s",
                         display: "inline-block",
                       }} />
                       <span style={{ 
-                        width: "8px", 
-                        height: "8px", 
+                        width: "10px", 
+                        height: "10px", 
                         borderRadius: "50%", 
-                        backgroundColor: "#9f7aea",
+                        backgroundColor: "#7E8C69",
                         animation: "pulse 1.4s ease-in-out infinite 0.4s",
                         display: "inline-block",
                       }} />
@@ -521,40 +757,47 @@ export default function Page() {
             {/* Action Buttons */}
             <div
               style={{
-                padding: "1rem 1.5rem",
+                padding: "1.25rem 1.5rem",
                 display: "flex",
                 flexWrap: "wrap",
-                gap: "0.75rem",
+                gap: "0.875rem",
+                background: "linear-gradient(180deg, rgba(236, 224, 218, 0.8) 0%, rgba(255, 255, 255, 0.95) 100%)",
+                borderTop: "2px solid rgba(126, 140, 105, 0.15)",
+                backdropFilter: "blur(10px)",
               }}
             >
               <button
                 onClick={() => sendMessage("I need a break")}
                 disabled={isLoading}
                 style={{
-                  padding: "0.75rem 1.5rem",
-                  borderRadius: "12px",
+                  padding: "0.875rem 1.625rem",
+                  borderRadius: "14px",
                   border: "none",
-                  backgroundColor: "#E69B97",
+                  background: selectedQuickAction === "I need a break" 
+                    ? "linear-gradient(135deg, #9CAD8C 0%, #7E8C69 100%)" 
+                    : "linear-gradient(135deg, #7E8C69 0%, #9CAD8C 100%)",
                   color: "white",
-                  fontSize: "0.9rem",
-                  fontWeight: "500",
+                  fontSize: "0.95rem",
+                  fontWeight: "600",
                   cursor: isLoading ? "not-allowed" : "pointer",
                   opacity: isLoading ? 0.6 : 1,
-                  transition: "all 0.2s ease",
-                  boxShadow: "0 2px 4px rgba(230, 155, 151, 0.2)",
+                  transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                  boxShadow: selectedQuickAction === "I need a break" 
+                    ? "0 4px 16px rgba(126, 140, 105, 0.4)" 
+                    : "0 2px 8px rgba(126, 140, 105, 0.25)",
                 }}
                 onMouseEnter={(e) => {
-                  if (!isLoading) {
-                    e.currentTarget.style.backgroundColor = "#EFC0BC";
-                    e.currentTarget.style.transform = "translateY(-1px)";
-                    e.currentTarget.style.boxShadow = "0 4px 8px rgba(230, 155, 151, 0.3)";
+                  if (!isLoading && selectedQuickAction !== "I need a break") {
+                    e.currentTarget.style.background = "linear-gradient(135deg, #9CAD8C 0%, #7E8C69 100%)";
+                    e.currentTarget.style.transform = "translateY(-2px)";
+                    e.currentTarget.style.boxShadow = "0 6px 18px rgba(126, 140, 105, 0.4)";
                   }
                 }}
                 onMouseLeave={(e) => {
-                  if (!isLoading) {
-                    e.currentTarget.style.backgroundColor = "#E69B97";
+                  if (!isLoading && selectedQuickAction !== "I need a break") {
+                    e.currentTarget.style.background = "linear-gradient(135deg, #7E8C69 0%, #9CAD8C 100%)";
                     e.currentTarget.style.transform = "translateY(0)";
-                    e.currentTarget.style.boxShadow = "0 2px 4px rgba(230, 155, 151, 0.2)";
+                    e.currentTarget.style.boxShadow = "0 2px 8px rgba(126, 140, 105, 0.25)";
                   }
                 }}
               >
@@ -564,30 +807,32 @@ export default function Page() {
                 onClick={() => sendMessage("Help with mind planning")}
                 disabled={isLoading}
                 style={{
-                  padding: "0.75rem 1.5rem",
-                  borderRadius: "12px",
+                  padding: "0.875rem 1.625rem",
+                  borderRadius: "14px",
                   border: "none",
-                  backgroundColor: "#828C6A",
+                  background: selectedQuickAction === "Help with mind planning" 
+                    ? "linear-gradient(135deg, #9CAD8C 0%, #7E8C69 100%)" 
+                    : "linear-gradient(135deg, #7E8C69 0%, #9CAD8C 100%)",
                   color: "white",
-                  fontSize: "0.9rem",
+                  fontSize: "0.95rem",
                   fontWeight: "500",
                   cursor: isLoading ? "not-allowed" : "pointer",
                   opacity: isLoading ? 0.6 : 1,
                   transition: "all 0.2s ease",
-                  boxShadow: "0 2px 4px rgba(130, 140, 106, 0.2)",
+                  boxShadow: selectedQuickAction === "Help with mind planning" ? "0 4px 12px rgba(126, 140, 105, 0.3)" : "0 2px 6px rgba(126, 140, 105, 0.2)",
                 }}
                 onMouseEnter={(e) => {
-                  if (!isLoading) {
-                    e.currentTarget.style.backgroundColor = "#A0AB89";
-                    e.currentTarget.style.transform = "translateY(-1px)";
-                    e.currentTarget.style.boxShadow = "0 4px 8px rgba(130, 140, 106, 0.3)";
+                  if (!isLoading && selectedQuickAction !== "Help with mind planning") {
+                    e.currentTarget.style.backgroundColor = "#9CAD8C";
+                    e.currentTarget.style.transform = "translateY(-2px)";
+                    e.currentTarget.style.boxShadow = "0 6px 14px rgba(126, 140, 105, 0.35)";
                   }
                 }}
                 onMouseLeave={(e) => {
-                  if (!isLoading) {
-                    e.currentTarget.style.backgroundColor = "#828C6A";
+                  if (!isLoading && selectedQuickAction !== "Help with mind planning") {
+                    e.currentTarget.style.backgroundColor = "#7E8C69";
                     e.currentTarget.style.transform = "translateY(0)";
-                    e.currentTarget.style.boxShadow = "0 2px 4px rgba(130, 140, 106, 0.2)";
+                    e.currentTarget.style.boxShadow = "0 2px 6px rgba(126, 140, 105, 0.2)";
                   }
                 }}
               >
@@ -597,30 +842,32 @@ export default function Page() {
                 onClick={() => sendMessage("Connect me to my village")}
                 disabled={isLoading}
                 style={{
-                  padding: "0.75rem 1.5rem",
-                  borderRadius: "12px",
+                  padding: "0.875rem 1.625rem",
+                  borderRadius: "14px",
                   border: "none",
-                  backgroundColor: "#828C6A",
+                  background: selectedQuickAction === "Connect me to my village" 
+                    ? "linear-gradient(135deg, #9CAD8C 0%, #7E8C69 100%)" 
+                    : "linear-gradient(135deg, #7E8C69 0%, #9CAD8C 100%)",
                   color: "white",
-                  fontSize: "0.9rem",
+                  fontSize: "0.95rem",
                   fontWeight: "500",
                   cursor: isLoading ? "not-allowed" : "pointer",
                   opacity: isLoading ? 0.6 : 1,
                   transition: "all 0.2s ease",
-                  boxShadow: "0 2px 4px rgba(130, 140, 106, 0.2)",
+                  boxShadow: selectedQuickAction === "Connect me to my village" ? "0 4px 12px rgba(126, 140, 105, 0.3)" : "0 2px 6px rgba(126, 140, 105, 0.2)",
                 }}
                 onMouseEnter={(e) => {
-                  if (!isLoading) {
-                    e.currentTarget.style.backgroundColor = "#A0AB89";
-                    e.currentTarget.style.transform = "translateY(-1px)";
-                    e.currentTarget.style.boxShadow = "0 4px 8px rgba(130, 140, 106, 0.3)";
+                  if (!isLoading && selectedQuickAction !== "Connect me to my village") {
+                    e.currentTarget.style.backgroundColor = "#9CAD8C";
+                    e.currentTarget.style.transform = "translateY(-2px)";
+                    e.currentTarget.style.boxShadow = "0 6px 14px rgba(126, 140, 105, 0.35)";
                   }
                 }}
                 onMouseLeave={(e) => {
-                  if (!isLoading) {
-                    e.currentTarget.style.backgroundColor = "#828C6A";
+                  if (!isLoading && selectedQuickAction !== "Connect me to my village") {
+                    e.currentTarget.style.backgroundColor = "#7E8C69";
                     e.currentTarget.style.transform = "translateY(0)";
-                    e.currentTarget.style.boxShadow = "0 2px 4px rgba(130, 140, 106, 0.2)";
+                    e.currentTarget.style.boxShadow = "0 2px 6px rgba(126, 140, 105, 0.2)";
                   }
                 }}
               >
@@ -630,30 +877,32 @@ export default function Page() {
                 onClick={() => sendMessage("Check in")}
                 disabled={isLoading}
                 style={{
-                  padding: "0.75rem 1.5rem",
-                  borderRadius: "12px",
+                  padding: "0.875rem 1.625rem",
+                  borderRadius: "14px",
                   border: "none",
-                  backgroundColor: "#828C6A",
+                  background: selectedQuickAction === "Check in" 
+                    ? "linear-gradient(135deg, #9CAD8C 0%, #7E8C69 100%)" 
+                    : "linear-gradient(135deg, #7E8C69 0%, #9CAD8C 100%)",
                   color: "white",
-                  fontSize: "0.9rem",
+                  fontSize: "0.95rem",
                   fontWeight: "500",
                   cursor: isLoading ? "not-allowed" : "pointer",
                   opacity: isLoading ? 0.6 : 1,
                   transition: "all 0.2s ease",
-                  boxShadow: "0 2px 4px rgba(130, 140, 106, 0.2)",
+                  boxShadow: selectedQuickAction === "Check in" ? "0 4px 12px rgba(126, 140, 105, 0.3)" : "0 2px 6px rgba(126, 140, 105, 0.2)",
                 }}
                 onMouseEnter={(e) => {
-                  if (!isLoading) {
-                    e.currentTarget.style.backgroundColor = "#A0AB89";
-                    e.currentTarget.style.transform = "translateY(-1px)";
-                    e.currentTarget.style.boxShadow = "0 4px 8px rgba(130, 140, 106, 0.3)";
+                  if (!isLoading && selectedQuickAction !== "Check in") {
+                    e.currentTarget.style.backgroundColor = "#9CAD8C";
+                    e.currentTarget.style.transform = "translateY(-2px)";
+                    e.currentTarget.style.boxShadow = "0 6px 14px rgba(126, 140, 105, 0.35)";
                   }
                 }}
                 onMouseLeave={(e) => {
-                  if (!isLoading) {
-                    e.currentTarget.style.backgroundColor = "#828C6A";
+                  if (!isLoading && selectedQuickAction !== "Check in") {
+                    e.currentTarget.style.backgroundColor = "#7E8C69";
                     e.currentTarget.style.transform = "translateY(0)";
-                    e.currentTarget.style.boxShadow = "0 2px 4px rgba(130, 140, 106, 0.2)";
+                    e.currentTarget.style.boxShadow = "0 2px 6px rgba(126, 140, 105, 0.2)";
                   }
                 }}
               >
@@ -664,53 +913,15 @@ export default function Page() {
             {/* Input Area */}
             <div
               style={{
-                padding: "1rem 1.5rem",
+                padding: "1.5rem",
                 display: "flex",
-                gap: "0.75rem",
+                gap: "1rem",
                 alignItems: "center",
-                backgroundColor: "#f7fafc",
-                borderTop: "1px solid #e2e8f0",
+                background: "linear-gradient(180deg, rgba(236, 224, 218, 0.9) 0%, rgba(255, 255, 255, 0.95) 100%)",
+                borderTop: "2px solid rgba(126, 140, 105, 0.15)",
+                backdropFilter: "blur(10px)",
               }}
             >
-              {/* Microphone Icon */}
-              <button
-                style={{
-                  width: "40px",
-                  height: "40px",
-                  borderRadius: "50%",
-                  border: "none",
-                  backgroundColor: "transparent",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "#718096",
-                  transition: "all 0.2s ease",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = "#edf2f7";
-                  e.currentTarget.style.color = "#4a5568";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = "transparent";
-                  e.currentTarget.style.color = "#718096";
-                }}
-              >
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                  <line x1="12" y1="19" x2="12" y2="23" />
-                  <line x1="8" y1="23" x2="16" y2="23" />
-                </svg>
-              </button>
-
               {/* Input Field */}
               <input
                 ref={inputRef}
@@ -722,24 +933,25 @@ export default function Page() {
                 disabled={isLoading}
                 style={{
                   flex: 1,
-                  padding: "0.875rem 1.25rem",
-                  border: "2px solid transparent",
-                  borderRadius: "24px",
+                  padding: "1rem 1.5rem",
+                  border: "2px solid rgba(126, 140, 105, 0.2)",
+                  borderRadius: "28px",
                   outline: "none",
-                  fontSize: "0.95rem",
-                  backgroundColor: "white",
+                  fontSize: "1rem",
+                  background: "linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.9) 100%)",
+                  backdropFilter: "blur(10px)",
                   color: "#2d3748",
                   opacity: isLoading ? 0.6 : 1,
-                  transition: "all 0.2s ease",
-                  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.05)",
+                  transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                  boxShadow: "0 2px 8px rgba(126, 140, 105, 0.1)",
                 }}
                 onFocus={(e) => {
-                  e.target.style.borderColor = "#828C6A";
-                  e.target.style.boxShadow = "0 0 0 3px rgba(130, 140, 106, 0.1)";
+                  e.target.style.borderColor = "#7E8C69";
+                  e.target.style.boxShadow = "0 0 0 4px rgba(126, 140, 105, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06)";
                 }}
                 onBlur={(e) => {
-                  e.target.style.borderColor = "transparent";
-                  e.target.style.boxShadow = "0 1px 3px rgba(0, 0, 0, 0.05)";
+                  e.target.style.borderColor = "rgba(126, 140, 105, 0.15)";
+                  e.target.style.boxShadow = "0 2px 6px rgba(0, 0, 0, 0.04)";
                 }}
               />
 
@@ -748,33 +960,35 @@ export default function Page() {
                 onClick={() => sendMessage()}
                 disabled={isLoading || !input.trim()}
                 style={{
-                  width: "44px",
-                  height: "44px",
+                  width: "52px",
+                  height: "52px",
                   borderRadius: "50%",
-                  backgroundColor: isLoading || !input.trim() ? "#cbd5e0" : "#828C6A",
+                  background: isLoading || !input.trim() 
+                    ? "linear-gradient(135deg, #cbd5e0 0%, #a0aec0 100%)" 
+                    : "linear-gradient(135deg, #7E8C69 0%, #9CAD8C 100%)",
                   color: "white",
                   border: "none",
                   cursor: isLoading || !input.trim() ? "not-allowed" : "pointer",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  transition: "all 0.2s ease",
+                  transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
                   boxShadow: isLoading || !input.trim() 
                     ? "none" 
-                    : "0 2px 6px rgba(130, 140, 106, 0.3)",
+                    : "0 4px 16px rgba(126, 140, 105, 0.3)",
                 }}
                 onMouseEnter={(e) => {
                   if (!isLoading && input.trim()) {
-                    e.currentTarget.style.backgroundColor = "#A0AB89";
-                    e.currentTarget.style.transform = "scale(1.05)";
-                    e.currentTarget.style.boxShadow = "0 4px 12px rgba(130, 140, 106, 0.4)";
+                    e.currentTarget.style.background = "linear-gradient(135deg, #9CAD8C 0%, #7E8C69 100%)";
+                    e.currentTarget.style.transform = "scale(1.1)";
+                    e.currentTarget.style.boxShadow = "0 6px 20px rgba(126, 140, 105, 0.4)";
                   }
                 }}
                 onMouseLeave={(e) => {
                   if (!isLoading && input.trim()) {
-                    e.currentTarget.style.backgroundColor = "#828C6A";
+                    e.currentTarget.style.background = "linear-gradient(135deg, #7E8C69 0%, #9CAD8C 100%)";
                     e.currentTarget.style.transform = "scale(1)";
-                    e.currentTarget.style.boxShadow = "0 2px 6px rgba(130, 140, 106, 0.3)";
+                    e.currentTarget.style.boxShadow = "0 4px 16px rgba(126, 140, 105, 0.3)";
                   }
                 }}
               >
