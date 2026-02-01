@@ -59,11 +59,22 @@ export default function CalendarPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [capacityMode, setCapacityMode] = useState<CapacityMode>("today");
 
-  // Events + persistence
-  const [events, setEvents] = useState<CalendarEvent[]>(() => safeLoadEvents());
+  // Events + persistence - only load on client to avoid hydration mismatch
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  // Load events only on client side after hydration
   useEffect(() => {
-    safeSaveEvents(events);
-  }, [events]);
+    setIsHydrated(true);
+    const loadedEvents = safeLoadEvents();
+    setEvents(loadedEvents);
+  }, []);
+
+  useEffect(() => {
+    if (isHydrated) {
+      safeSaveEvents(events);
+    }
+  }, [events, isHydrated]);
 
   // Undo/redo
   const [past, setPast] = useState<CalendarEvent[][]>([]);
@@ -72,6 +83,7 @@ export default function CalendarPage() {
   // Modals
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [showCapInfo, setShowCapInfo] = useState(false);
+  const [isAddTodayTaskOpen, setIsAddTodayTaskOpen] = useState(false);
 
   // Day overlay
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
@@ -145,9 +157,9 @@ export default function CalendarPage() {
 
   // Derived day events (live)
   const selectedDayEvents = useMemo(() => {
-    if (!selectedDay) return [];
+    if (!selectedDay || !isHydrated) return [];
     return events.filter((e) => e.date === selectedDay);
-  }, [events, selectedDay]);
+  }, [events, selectedDay, isHydrated]);
 
   const isDayEmpty = selectedDay ? selectedDayEvents.length === 0 : true;
 
@@ -193,8 +205,30 @@ export default function CalendarPage() {
     setIsAllDay(false);
   };
 
+  const handleAddTodayTask = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    saveHistory();
+
+    const formData = new FormData(e.currentTarget);
+
+    const newEv: CalendarEvent = {
+      id: Date.now(),
+      title: (formData.get("title") as string) || "",
+      desc: (formData.get("desc") as string) || "",
+      date: todayStr,
+      time: "All Day",
+      load: ((formData.get("load") as string) || "medium") as LoadLevel,
+      isAllDay: true,
+      completed: false,
+    };
+
+    setEvents((prev) => [...prev, newEv]);
+    setIsAddTodayTaskOpen(false);
+  };
+
   // --- DYNAMIC CAPACITY ---
   const capacity = useMemo(() => {
+    if (!isHydrated) return 0;
     const weights: Record<LoadLevel, number> = {
       light: 1,
       medium: 3,
@@ -227,10 +261,11 @@ export default function CalendarPage() {
       Math.floor((totalWeight / thresholds[capacityMode]) * 100),
       100,
     );
-  }, [events, capacityMode, month, year, todayStr]);
+  }, [events, capacityMode, month, year, todayStr, isHydrated]);
 
   // Top priorities list
   const topPriorityItems = useMemo(() => {
+    if (!isHydrated) return [];
     const active = events.filter((e) => !e.completed);
     const animating = events.filter((e) => priorityAnimatingIds.includes(e.id));
     const merged = [
@@ -238,7 +273,13 @@ export default function CalendarPage() {
       ...animating.filter((a) => !active.some((x) => x.id === a.id)),
     ];
     return merged.slice(0, isPriorityExpanded ? 10 : 3);
-  }, [events, priorityAnimatingIds, isPriorityExpanded]);
+  }, [events, priorityAnimatingIds, isPriorityExpanded, isHydrated]);
+
+  // Today's to-do list - only show incomplete tasks
+  const todayTodos = useMemo(() => {
+    if (!isHydrated) return [];
+    return events.filter((e) => e.date === todayStr && !e.completed);
+  }, [events, todayStr, isHydrated]);
 
   // Anim variants for day cards
   const dayListVariants = {
@@ -343,7 +384,7 @@ export default function CalendarPage() {
                 const dayNum = i + 1;
                 const dateObj = new Date(year, month, dayNum);
                 const dateString = dateObj.toISOString().split("T")[0];
-                const dayEvents = events.filter((e) => e.date === dateString);
+                const dayEvents = isHydrated ? events.filter((e) => e.date === dateString) : [];
                 const isToday = dateString === todayStr;
 
                 return (
@@ -366,21 +407,23 @@ export default function CalendarPage() {
                     </span>
 
                     {/* Dots stay visible even when completed */}
-                    <div className="flex flex-wrap gap-1 justify-end">
-                      {dayEvents.map((e) => (
-                        <div
-                          key={e.id}
-                          title={e.title}
-                          className={`w-2.5 h-2.5 rounded-full ${getSoftColor(
-                            e.load,
-                          )} ${
-                            e.completed
-                              ? "ring-1 ring-ma-eggplant/40 opacity-70"
-                              : ""
-                          }`}
-                        />
-                      ))}
-                    </div>
+                    {isHydrated && (
+                      <div className="flex flex-wrap gap-1 justify-end">
+                        {dayEvents.map((e) => (
+                          <div
+                            key={e.id}
+                            title={e.title}
+                            className={`w-2.5 h-2.5 rounded-full ${getSoftColor(
+                              e.load,
+                            )} ${
+                              e.completed
+                                ? "ring-1 ring-ma-eggplant/40 opacity-70"
+                                : ""
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -525,6 +568,104 @@ export default function CalendarPage() {
                   />
                 </div>
               </div>
+            </div>
+
+            {/* To Do for Today */}
+            <div className="bg-white/80 rounded-[2rem] p-8 border border-white shadow-sm backdrop-blur-sm">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-1 h-8 bg-gradient-to-b from-[#7E8C69] to-[#9CAD8C] rounded-full"></div>
+                  <h3 className="text-2xl font-serif font-bold text-ma-eggplant">
+                    To Do for Today
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setIsAddTodayTaskOpen(true)}
+                  className="p-2 rounded-full bg-ma-terracotta text-white hover:bg-ma-rose transition-all shadow-md hover:shadow-lg"
+                  title="Add task for today"
+                >
+                  <Plus className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                <AnimatePresence initial={false}>
+                  {todayTodos.length === 0 ? (
+                    <div className="text-sm opacity-60 italic text-center py-8 bg-white/40 rounded-[1.5rem] p-4">
+                      No tasks for today. Enjoy your day! ✨
+                    </div>
+                  ) : (
+                    todayTodos.map((event) => {
+                      const isCompleting = priorityAnimatingIds.includes(event.id);
+                      const showCompletedStyle = event.completed || isCompleting;
+
+                      return (
+                        <motion.div
+                          key={event.id}
+                          layout
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{
+                            opacity: 0,
+                            y: -8,
+                            transition: { duration: 0.2 },
+                          }}
+                        >
+                          <button
+                            onClick={() => toggleCompleteFromPriority(event.id)}
+                            className="w-full bg-ma-sand/20 p-4 rounded-[1.5rem] flex items-start gap-3 border border-white/50 hover:bg-white transition-all group overflow-hidden"
+                          >
+                            <div className="flex-shrink-0 mt-0.5">
+                              <motion.div
+                                initial={false}
+                                animate={{ scale: [1, 1.15, 1] }}
+                                transition={{ duration: 0.22 }}
+                              >
+                                {showCompletedStyle ? (
+                                  <CheckCircle2 className="w-5 h-5 text-ma-rose" />
+                                ) : (
+                                  <Circle className="text-ma-plum/10 group-hover:text-ma-rose w-5 h-5 transition-colors" />
+                                )}
+                              </motion.div>
+                            </div>
+
+                            <div className="flex-1 text-left min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <div
+                                  className={`w-2 h-2 rounded-full flex-shrink-0 ${getSoftColor(
+                                    event.load,
+                                  )}`}
+                                />
+                                <span className="font-medium text-sm text-ma-eggplant">
+                                  {event.title}
+                                </span>
+                              </div>
+                              {event.time !== "All Day" && (
+                                <span className="text-[10px] opacity-40 uppercase tracking-widest text-ma-plum">
+                                  {event.time}
+                                </span>
+                              )}
+                              {event.desc && (
+                                <p className="text-xs opacity-60 mt-1 line-clamp-1">
+                                  {event.desc}
+                                </p>
+                              )}
+                            </div>
+                          </button>
+                        </motion.div>
+                      );
+                    })
+                  )}
+                </AnimatePresence>
+              </div>
+
+              {todayTodos.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-ma-sand/30">
+                  <div className="text-xs opacity-50 text-center text-ma-plum">
+                    {todayTodos.length} task{todayTodos.length !== 1 ? 's' : ''} remaining
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -803,6 +944,96 @@ export default function CalendarPage() {
                     className="w-full bg-ma-terracotta text-white py-6 rounded-full font-bold shadow-lg text-xl mt-6 uppercase tracking-widest hover:brightness-105 transition-all"
                   >
                     Create Event
+                  </button>
+                </div>
+              </motion.form>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ADD TODAY TASK MODAL */}
+        <AnimatePresence>
+          {isAddTodayTaskOpen && (
+            <motion.div
+              className="fixed inset-0 bg-ma-eggplant/30 backdrop-blur-lg z-[80] flex items-center justify-center p-6"
+              onClick={() => setIsAddTodayTaskOpen(false)}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
+              <motion.form
+                onSubmit={handleAddTodayTask}
+                className="bg-white rounded-[3rem] p-12 max-w-md w-full shadow-2xl relative"
+                onClick={(e) => e.stopPropagation()}
+                initial={{ y: 18, opacity: 0, scale: 0.98 }}
+                animate={{ y: 0, opacity: 1, scale: 1 }}
+                exit={{ y: 18, opacity: 0, scale: 0.98 }}
+                transition={{ duration: 0.22 }}
+              >
+                <button
+                  type="button"
+                  onClick={() => setIsAddTodayTaskOpen(false)}
+                  className="absolute top-8 right-8 rounded-full p-3 hover:bg-ma-sand/30 transition-all"
+                  aria-label="Close"
+                >
+                  <X className="w-10 h-10 opacity-30 hover:opacity-100 transition-opacity" />
+                </button>
+
+                <h2 className="text-4xl font-serif mb-10 tracking-tight text-ma-eggplant">
+                  Add Task for Today
+                </h2>
+
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold opacity-30 uppercase tracking-widest ml-1">
+                      Task Title
+                    </label>
+                    <input
+                      name="title"
+                      required
+                      placeholder="What needs to be done?"
+                      className="w-full p-5 bg-ma-sand/10 rounded-[1.2rem] outline-none focus:border-ma-rose transition-all"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold opacity-30 uppercase tracking-widest ml-1">
+                      Description (Optional)
+                    </label>
+                    <textarea
+                      name="desc"
+                      placeholder="Add any notes..."
+                      rows={2}
+                      className="w-full p-5 bg-ma-sand/10 rounded-[1.2rem] outline-none"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-4 pt-4">
+                    {(["heavy", "medium", "light"] as const).map((l) => (
+                      <label key={l} className="cursor-pointer">
+                        <input
+                          type="radio"
+                          name="load"
+                          value={l}
+                          defaultChecked={l === "medium"}
+                          className="peer sr-only"
+                        />
+                        <div
+                          className={`p-4 text-center rounded-[1.2rem] opacity-40 peer-checked:opacity-100 peer-checked:ring-2 ring-ma-eggplant ring-offset-4 transition-all ${getSoftColor(
+                            l,
+                          )} text-ma-eggplant text-[9px] font-bold uppercase tracking-widest`}
+                        >
+                          {l}
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full bg-gradient-to-r from-[#7E8C69] to-[#9CAD8C] text-white py-6 rounded-full font-bold shadow-lg text-xl mt-6 uppercase tracking-widest hover:brightness-105 transition-all"
+                  >
+                    Add Task
                   </button>
                 </div>
               </motion.form>

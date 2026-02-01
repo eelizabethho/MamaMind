@@ -216,6 +216,7 @@ export default function Navbar() {
         </span>
       </Link>
 
+      {/* Navigation Items + Profile */}
       <div
         style={{
           display: "flex",
@@ -231,25 +232,22 @@ export default function Navbar() {
             <Link
               key={item.href}
               href={item.href}
+              prefetch={false}
               style={active ? activeLinkStyle : baseLinkStyle}
-              onMouseEnter={(e) =>
-                handleHoverIn(e.currentTarget as unknown as HTMLElement, active)
-              }
-              onMouseLeave={(e) =>
-                handleHoverOut(
-                  e.currentTarget as unknown as HTMLElement,
-                  active,
-                )
-              }
+              onMouseEnter={(e) => handleHoverIn(e.currentTarget, active)}
+              onMouseLeave={(e) => handleHoverOut(e.currentTarget, active)}
             >
               {item.label}
             </Link>
           );
         })}
-
         {session ? (
           <div
-            style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.75rem",
+            }}
           >
             {displayImage && (
               <Image

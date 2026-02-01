@@ -7,6 +7,8 @@ import React, { useState, useMemo, useEffect } from 'react';
 import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
 import { useSession } from "next-auth/react";
+import { FinancialAreaChart } from "../components/charts/FinancialAreaChart";
+import { FinancialPieChart } from "../components/charts/FinancialPieChart";
 
 //Added categories of transactions
 type TransactionType = 'income' | 'expense' | 'bill';
@@ -142,6 +144,12 @@ export default function FinanceTracker() {
               <h2 className={`text-7xl font-serif mt-2 tracking-tighter ${stats.safe < 0 ? 'text-[#c27664]' : 'text-[#2d1b2d]'}`}>
                 ${stats.safe.toFixed(2)}
               </h2>
+            </div>
+
+            {/* Charts */}
+            <div className="grid grid-cols-1 gap-6">
+              <FinancialAreaChart transactions={transactions} />
+              <FinancialPieChart transactions={transactions} activeMonth={activeMonth} />
             </div>
 
             <div className={`bg-white/60 backdrop-blur-sm p-6 rounded-[2.5rem] border-2 transition-all shadow-lg ${editingId ? 'border-[#9caf88]' : 'border-white'}`}>
