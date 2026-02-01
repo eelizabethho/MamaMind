@@ -1,6 +1,37 @@
 "use client";
 
+import { useSession } from "next-auth/react";
+import { useState, useEffect } from "react";
+import ProfilePictureEditor from "./ProfilePictureEditor";
+
 export default function Sidebar() {
+  const { data: session } = useSession();
+  const [customProfileImage, setCustomProfileImage] = useState<string | null>(null);
+  
+  // Get first name from full name
+  const firstName = session?.user?.name?.split(" ")[0] || null;
+
+  // Load custom profile image from localStorage on mount
+  useEffect(() => {
+    if (session?.user?.email) {
+      const savedImage = localStorage.getItem(`profile_image_${session.user.email}`);
+      if (savedImage) {
+        setCustomProfileImage(savedImage);
+      }
+    }
+  }, [session?.user?.email]);
+
+  // Save custom profile image to localStorage
+  const handleImageChange = (imageUrl: string) => {
+    setCustomProfileImage(imageUrl);
+    if (session?.user?.email) {
+      localStorage.setItem(`profile_image_${session.user.email}`, imageUrl);
+    }
+  };
+
+  // Use custom image if available, otherwise use Google image
+  const displayImage = customProfileImage || session?.user?.image || null;
+
   return (
     <div
       style={{
@@ -26,43 +57,23 @@ export default function Sidebar() {
           borderBottom: "1px solid #e2e8f0",
         }}
       >
-        <div
-          style={{
-            width: "80px",
-            height: "80px",
-            borderRadius: "50%",
-            backgroundColor: "#614051",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            color: "white",
-            fontSize: "2rem",
-            fontWeight: "600",
-            boxShadow: "0 4px 12px rgba(97, 64, 81, 0.3)",
-          }}
-        >
-          U
-        </div>
+        <ProfilePictureEditor
+          currentImage={displayImage}
+          onImageChange={handleImageChange}
+          userName={session?.user?.name || null}
+        />
         <div style={{ textAlign: "center" }}>
           <h3
             style={{
-              fontSize: "1.1rem",
+              fontSize: "1.2rem",
+              fontFamily: "var(--font-dancing), cursive",
               fontWeight: "600",
               color: "#2d3748",
-              margin: "0 0 0.25rem 0",
-            }}
-          >
-            Welcome Back
-          </h3>
-          <p
-            style={{
-              fontSize: "0.875rem",
-              color: "#718096",
               margin: 0,
             }}
           >
-            Your village is here
-          </p>
+            {firstName ? `Welcome ${firstName}!` : "Welcome!"}
+          </h3>
         </div>
       </div>
 

@@ -2,8 +2,25 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { useSession, signIn, signOut } from "next-auth/react";
+import { useState, useEffect } from "react";
 
 export default function Navbar() {
+  const { data: session } = useSession();
+  const [customProfileImage, setCustomProfileImage] = useState<string | null>(null);
+
+  // Load custom profile image from localStorage
+  useEffect(() => {
+    if (session?.user?.email) {
+      const savedImage = localStorage.getItem(`profile_image_${session.user.email}`);
+      if (savedImage) {
+        setCustomProfileImage(savedImage);
+      }
+    }
+  }, [session?.user?.email]);
+
+  // Use custom image if available, otherwise use Google image
+  const displayImage = customProfileImage || session?.user?.image || null;
   return (
     <nav
       style={{
@@ -202,49 +219,75 @@ export default function Navbar() {
         >
           Messages
         </Link>
-        <div
-          style={{
-            width: "40px",
-            height: "40px",
-            borderRadius: "50%",
-            background: "linear-gradient(135deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.12) 100%)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            cursor: "pointer",
-            transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-            border: "1.5px solid rgba(255, 255, 255, 0.2)",
-            boxShadow: "0 3px 10px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.15)",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = "linear-gradient(135deg, rgba(255, 255, 255, 0.28) 0%, rgba(255, 255, 255, 0.18) 100%)";
-            e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.3)";
-            e.currentTarget.style.transform = "scale(1.1)";
-            e.currentTarget.style.boxShadow = "0 5px 15px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = "linear-gradient(135deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.12) 100%)";
-            e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.2)";
-            e.currentTarget.style.transform = "scale(1)";
-            e.currentTarget.style.boxShadow = "0 3px 10px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.15)";
-          }}
-        >
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="white"
-            strokeWidth="2.5"
-            strokeLinecap="round"
+        {session ? (
+          <div
             style={{
-              filter: "drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3))",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.75rem",
             }}
           >
-            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-            <circle cx="12" cy="7" r="4" />
-          </svg>
-        </div>
+            {displayImage && (
+              <Image
+                src={displayImage}
+                alt={session.user?.name || "User"}
+                width={40}
+                height={40}
+                style={{
+                  borderRadius: "50%",
+                  border: "1.5px solid rgba(255, 255, 255, 0.2)",
+                }}
+              />
+            )}
+            <button
+              onClick={() => signOut()}
+              style={{
+                padding: "0.5rem 1rem",
+                borderRadius: "10px",
+                border: "1px solid rgba(255, 255, 255, 0.2)",
+                background: "rgba(255, 255, 255, 0.1)",
+                color: "white",
+                fontSize: "0.875rem",
+                fontWeight: "500",
+                cursor: "pointer",
+                transition: "all 0.3s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "rgba(255, 255, 255, 0.2)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "rgba(255, 255, 255, 0.1)";
+              }}
+            >
+              Sign Out
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => signIn("google")}
+            style={{
+              padding: "0.5rem 1rem",
+              borderRadius: "10px",
+              border: "1px solid rgba(255, 255, 255, 0.2)",
+              background: "rgba(255, 255, 255, 0.15)",
+              color: "white",
+              fontSize: "0.875rem",
+              fontWeight: "500",
+              cursor: "pointer",
+              transition: "all 0.3s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "rgba(255, 255, 255, 0.25)";
+              e.currentTarget.style.transform = "translateY(-2px)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "rgba(255, 255, 255, 0.15)";
+              e.currentTarget.style.transform = "translateY(0)";
+            }}
+          >
+            Sign In
+          </button>
+        )}
       </div>
     </nav>
   );
