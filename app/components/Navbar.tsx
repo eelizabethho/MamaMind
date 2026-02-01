@@ -24,8 +24,8 @@ export default function Navbar() {
   return (
     <nav
       style={{
-        background: "#614051",
-        padding: "1rem 3rem",
+        background: "#51295b",
+        padding: "0.5rem 3rem",
         boxShadow: "0 4px 20px rgba(97, 64, 81, 0.4)",
         display: "flex",
         justifyContent: "space-between",
@@ -34,6 +34,7 @@ export default function Navbar() {
         top: 0,
         zIndex: 100,
         borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
+        minHeight: "70px",
       }}
     >
       <Link
@@ -78,8 +79,8 @@ export default function Navbar() {
             justifyContent: "center",
             borderRadius: "50%",
             overflow: "hidden",
-            width: "50px",
-            height: "50px",
+            width: "70px",
+            height: "70px",
             border: "2px solid rgba(255, 255, 255, 0.2)",
             boxShadow: "0 2px 10px rgba(0, 0, 0, 0.3)",
             transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
@@ -89,8 +90,8 @@ export default function Navbar() {
           <Image
             src="/logo.png"
             alt="Avec Ma Logo"
-            width={50}
-            height={50}
+            width={70}
+            height={70}
             style={{
               objectFit: "cover",
               width: "100%",
@@ -231,8 +232,8 @@ export default function Navbar() {
               <Image
                 src={displayImage}
                 alt={session.user?.name || "User"}
-                width={40}
-                height={40}
+                width={55}
+                height={55}
                 style={{
                   borderRadius: "50%",
                   border: "1.5px solid rgba(255, 255, 255, 0.2)",

@@ -35,7 +35,7 @@ export default function Sidebar() {
   return (
     <div
       style={{
-        width: "300px",
+        width: "360px",
         backgroundColor: "#f8f9fa",
         borderRight: "1px solid #e2e8f0",
         padding: "2rem 1.5rem",
@@ -103,7 +103,7 @@ export default function Sidebar() {
               padding: "0.875rem 1rem",
               borderRadius: "12px",
               border: "none",
-              backgroundColor: "#d69e2e",
+              backgroundColor: "#E69B97",
               color: "white",
               fontSize: "0.9rem",
               fontWeight: "500",
@@ -112,11 +112,11 @@ export default function Sidebar() {
               textAlign: "left",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "#c0841c";
+              e.currentTarget.style.backgroundColor = "#EFC0BC";
               e.currentTarget.style.transform = "translateX(4px)";
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "#d69e2e";
+              e.currentTarget.style.backgroundColor = "#E69B97";
               e.currentTarget.style.transform = "translateX(0)";
             }}
           >
@@ -127,8 +127,8 @@ export default function Sidebar() {
               padding: "0.875rem 1rem",
               borderRadius: "12px",
               border: "none",
-              backgroundColor: "#90cdf4",
-              color: "#1a202c",
+              backgroundColor: "#828C6A",
+              color: "white",
               fontSize: "0.9rem",
               fontWeight: "500",
               cursor: "pointer",
@@ -136,11 +136,11 @@ export default function Sidebar() {
               textAlign: "left",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "#7bb8e8";
+              e.currentTarget.style.backgroundColor = "#A0AB89";
               e.currentTarget.style.transform = "translateX(4px)";
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "#90cdf4";
+              e.currentTarget.style.backgroundColor = "#828C6A";
               e.currentTarget.style.transform = "translateX(0)";
             }}
           >
@@ -151,8 +151,8 @@ export default function Sidebar() {
               padding: "0.875rem 1rem",
               borderRadius: "12px",
               border: "none",
-              backgroundColor: "#90cdf4",
-              color: "#1a202c",
+              backgroundColor: "#828C6A",
+              color: "white",
               fontSize: "0.9rem",
               fontWeight: "500",
               cursor: "pointer",
@@ -160,11 +160,11 @@ export default function Sidebar() {
               textAlign: "left",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "#7bb8e8";
+              e.currentTarget.style.backgroundColor = "#A0AB89";
               e.currentTarget.style.transform = "translateX(4px)";
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "#90cdf4";
+              e.currentTarget.style.backgroundColor = "#828C6A";
               e.currentTarget.style.transform = "translateX(0)";
             }}
           >
@@ -175,8 +175,8 @@ export default function Sidebar() {
               padding: "0.875rem 1rem",
               borderRadius: "12px",
               border: "none",
-              backgroundColor: "#90cdf4",
-              color: "#1a202c",
+              backgroundColor: "#828C6A",
+              color: "white",
               fontSize: "0.9rem",
               fontWeight: "500",
               cursor: "pointer",
@@ -184,11 +184,11 @@ export default function Sidebar() {
               textAlign: "left",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "#7bb8e8";
+              e.currentTarget.style.backgroundColor = "#A0AB89";
               e.currentTarget.style.transform = "translateX(4px)";
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "#90cdf4";
+              e.currentTarget.style.backgroundColor = "#828C6A";
               e.currentTarget.style.transform = "translateX(0)";
             }}
           >
@@ -228,12 +228,14 @@ export default function Sidebar() {
               transition: "all 0.2s ease",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = "#614051";
-              e.currentTarget.style.boxShadow = "0 2px 8px rgba(97, 64, 81, 0.1)";
+              e.currentTarget.style.borderColor = "#828C6A";
+              e.currentTarget.style.boxShadow = "0 2px 8px rgba(130, 140, 106, 0.1)";
+              e.currentTarget.style.backgroundColor = "#F6E5E7";
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.borderColor = "#e2e8f0";
               e.currentTarget.style.boxShadow = "none";
+              e.currentTarget.style.backgroundColor = "white";
             }}
           >
             <div
@@ -265,12 +267,14 @@ export default function Sidebar() {
               transition: "all 0.2s ease",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = "#614051";
-              e.currentTarget.style.boxShadow = "0 2px 8px rgba(97, 64, 81, 0.1)";
+              e.currentTarget.style.borderColor = "#828C6A";
+              e.currentTarget.style.boxShadow = "0 2px 8px rgba(130, 140, 106, 0.1)";
+              e.currentTarget.style.backgroundColor = "#F6E5E7";
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.borderColor = "#e2e8f0";
               e.currentTarget.style.boxShadow = "none";
+              e.currentTarget.style.backgroundColor = "white";
             }}
           >
             <div
@@ -320,17 +324,17 @@ export default function Sidebar() {
             href="#"
             style={{
               fontSize: "0.875rem",
-              color: "#614051",
+              color: "#828C6A",
               textDecoration: "none",
               padding: "0.5rem 0",
               transition: "all 0.2s ease",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.color = "#4a2d3f";
+              e.currentTarget.style.color = "#A0AB89";
               e.currentTarget.style.paddingLeft = "8px";
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.color = "#614051";
+              e.currentTarget.style.color = "#828C6A";
               e.currentTarget.style.paddingLeft = "0";
             }}
           >
@@ -340,17 +344,17 @@ export default function Sidebar() {
             href="#"
             style={{
               fontSize: "0.875rem",
-              color: "#614051",
+              color: "#828C6A",
               textDecoration: "none",
               padding: "0.5rem 0",
               transition: "all 0.2s ease",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.color = "#4a2d3f";
+              e.currentTarget.style.color = "#A0AB89";
               e.currentTarget.style.paddingLeft = "8px";
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.color = "#614051";
+              e.currentTarget.style.color = "#828C6A";
               e.currentTarget.style.paddingLeft = "0";
             }}
           >
@@ -360,17 +364,17 @@ export default function Sidebar() {
             href="#"
             style={{
               fontSize: "0.875rem",
-              color: "#614051",
+              color: "#828C6A",
               textDecoration: "none",
               padding: "0.5rem 0",
               transition: "all 0.2s ease",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.color = "#4a2d3f";
+              e.currentTarget.style.color = "#A0AB89";
               e.currentTarget.style.paddingLeft = "8px";
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.color = "#614051";
+              e.currentTarget.style.color = "#828C6A";
               e.currentTarget.style.paddingLeft = "0";
             }}
           >

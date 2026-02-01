@@ -291,7 +291,7 @@ export default function Page() {
             display: "flex",
             flexDirection: "column",
             justifyContent: "flex-start",
-            alignItems: "flex-end",
+            alignItems: "center",
             padding: "2rem",
           }}
         >
@@ -299,14 +299,13 @@ export default function Page() {
             style={{
               width: "100%",
               maxWidth: "900px",
-              backgroundColor: "#fefefe",
+              backgroundColor: "#ece8d5",
               borderRadius: "16px",
               boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)",
               display: "flex",
               flexDirection: "column",
               overflow: "hidden",
               minHeight: "80vh",
-              marginLeft: "auto",
             }}
           >
             {/* Welcome Header */}
@@ -337,7 +336,7 @@ export default function Page() {
                 display: "flex",
                 flexDirection: "column",
                 gap: "1.25rem",
-                backgroundColor: "#fefefe",
+                backgroundColor: "#ece8d5",
                 scrollBehavior: "smooth",
               }}
             >
@@ -535,27 +534,27 @@ export default function Page() {
                   padding: "0.75rem 1.5rem",
                   borderRadius: "12px",
                   border: "none",
-                  backgroundColor: "#d69e2e",
+                  backgroundColor: "#E69B97",
                   color: "white",
                   fontSize: "0.9rem",
                   fontWeight: "500",
                   cursor: isLoading ? "not-allowed" : "pointer",
                   opacity: isLoading ? 0.6 : 1,
                   transition: "all 0.2s ease",
-                  boxShadow: "0 2px 4px rgba(214, 158, 46, 0.2)",
+                  boxShadow: "0 2px 4px rgba(230, 155, 151, 0.2)",
                 }}
                 onMouseEnter={(e) => {
                   if (!isLoading) {
-                    e.currentTarget.style.backgroundColor = "#c0841c";
+                    e.currentTarget.style.backgroundColor = "#EFC0BC";
                     e.currentTarget.style.transform = "translateY(-1px)";
-                    e.currentTarget.style.boxShadow = "0 4px 8px rgba(214, 158, 46, 0.3)";
+                    e.currentTarget.style.boxShadow = "0 4px 8px rgba(230, 155, 151, 0.3)";
                   }
                 }}
                 onMouseLeave={(e) => {
                   if (!isLoading) {
-                    e.currentTarget.style.backgroundColor = "#d69e2e";
+                    e.currentTarget.style.backgroundColor = "#E69B97";
                     e.currentTarget.style.transform = "translateY(0)";
-                    e.currentTarget.style.boxShadow = "0 2px 4px rgba(214, 158, 46, 0.2)";
+                    e.currentTarget.style.boxShadow = "0 2px 4px rgba(230, 155, 151, 0.2)";
                   }
                 }}
               >
@@ -568,27 +567,27 @@ export default function Page() {
                   padding: "0.75rem 1.5rem",
                   borderRadius: "12px",
                   border: "none",
-                  backgroundColor: "#90cdf4",
-                  color: "#1a202c",
+                  backgroundColor: "#828C6A",
+                  color: "white",
                   fontSize: "0.9rem",
                   fontWeight: "500",
                   cursor: isLoading ? "not-allowed" : "pointer",
                   opacity: isLoading ? 0.6 : 1,
                   transition: "all 0.2s ease",
-                  boxShadow: "0 2px 4px rgba(144, 205, 244, 0.2)",
+                  boxShadow: "0 2px 4px rgba(130, 140, 106, 0.2)",
                 }}
                 onMouseEnter={(e) => {
                   if (!isLoading) {
-                    e.currentTarget.style.backgroundColor = "#7bb8e8";
+                    e.currentTarget.style.backgroundColor = "#A0AB89";
                     e.currentTarget.style.transform = "translateY(-1px)";
-                    e.currentTarget.style.boxShadow = "0 4px 8px rgba(144, 205, 244, 0.3)";
+                    e.currentTarget.style.boxShadow = "0 4px 8px rgba(130, 140, 106, 0.3)";
                   }
                 }}
                 onMouseLeave={(e) => {
                   if (!isLoading) {
-                    e.currentTarget.style.backgroundColor = "#90cdf4";
+                    e.currentTarget.style.backgroundColor = "#828C6A";
                     e.currentTarget.style.transform = "translateY(0)";
-                    e.currentTarget.style.boxShadow = "0 2px 4px rgba(144, 205, 244, 0.2)";
+                    e.currentTarget.style.boxShadow = "0 2px 4px rgba(130, 140, 106, 0.2)";
                   }
                 }}
               >
@@ -601,27 +600,27 @@ export default function Page() {
                   padding: "0.75rem 1.5rem",
                   borderRadius: "12px",
                   border: "none",
-                  backgroundColor: "#90cdf4",
-                  color: "#1a202c",
+                  backgroundColor: "#828C6A",
+                  color: "white",
                   fontSize: "0.9rem",
                   fontWeight: "500",
                   cursor: isLoading ? "not-allowed" : "pointer",
                   opacity: isLoading ? 0.6 : 1,
                   transition: "all 0.2s ease",
-                  boxShadow: "0 2px 4px rgba(144, 205, 244, 0.2)",
+                  boxShadow: "0 2px 4px rgba(130, 140, 106, 0.2)",
                 }}
                 onMouseEnter={(e) => {
                   if (!isLoading) {
-                    e.currentTarget.style.backgroundColor = "#7bb8e8";
+                    e.currentTarget.style.backgroundColor = "#A0AB89";
                     e.currentTarget.style.transform = "translateY(-1px)";
-                    e.currentTarget.style.boxShadow = "0 4px 8px rgba(144, 205, 244, 0.3)";
+                    e.currentTarget.style.boxShadow = "0 4px 8px rgba(130, 140, 106, 0.3)";
                   }
                 }}
                 onMouseLeave={(e) => {
                   if (!isLoading) {
-                    e.currentTarget.style.backgroundColor = "#90cdf4";
+                    e.currentTarget.style.backgroundColor = "#828C6A";
                     e.currentTarget.style.transform = "translateY(0)";
-                    e.currentTarget.style.boxShadow = "0 2px 4px rgba(144, 205, 244, 0.2)";
+                    e.currentTarget.style.boxShadow = "0 2px 4px rgba(130, 140, 106, 0.2)";
                   }
                 }}
               >
@@ -634,27 +633,27 @@ export default function Page() {
                   padding: "0.75rem 1.5rem",
                   borderRadius: "12px",
                   border: "none",
-                  backgroundColor: "#90cdf4",
-                  color: "#1a202c",
+                  backgroundColor: "#828C6A",
+                  color: "white",
                   fontSize: "0.9rem",
                   fontWeight: "500",
                   cursor: isLoading ? "not-allowed" : "pointer",
                   opacity: isLoading ? 0.6 : 1,
                   transition: "all 0.2s ease",
-                  boxShadow: "0 2px 4px rgba(144, 205, 244, 0.2)",
+                  boxShadow: "0 2px 4px rgba(130, 140, 106, 0.2)",
                 }}
                 onMouseEnter={(e) => {
                   if (!isLoading) {
-                    e.currentTarget.style.backgroundColor = "#7bb8e8";
+                    e.currentTarget.style.backgroundColor = "#A0AB89";
                     e.currentTarget.style.transform = "translateY(-1px)";
-                    e.currentTarget.style.boxShadow = "0 4px 8px rgba(144, 205, 244, 0.3)";
+                    e.currentTarget.style.boxShadow = "0 4px 8px rgba(130, 140, 106, 0.3)";
                   }
                 }}
                 onMouseLeave={(e) => {
                   if (!isLoading) {
-                    e.currentTarget.style.backgroundColor = "#90cdf4";
+                    e.currentTarget.style.backgroundColor = "#828C6A";
                     e.currentTarget.style.transform = "translateY(0)";
-                    e.currentTarget.style.boxShadow = "0 2px 4px rgba(144, 205, 244, 0.2)";
+                    e.currentTarget.style.boxShadow = "0 2px 4px rgba(130, 140, 106, 0.2)";
                   }
                 }}
               >
@@ -735,8 +734,8 @@ export default function Page() {
                   boxShadow: "0 1px 3px rgba(0, 0, 0, 0.05)",
                 }}
                 onFocus={(e) => {
-                  e.target.style.borderColor = "#9f7aea";
-                  e.target.style.boxShadow = "0 0 0 3px rgba(159, 122, 234, 0.1)";
+                  e.target.style.borderColor = "#828C6A";
+                  e.target.style.boxShadow = "0 0 0 3px rgba(130, 140, 106, 0.1)";
                 }}
                 onBlur={(e) => {
                   e.target.style.borderColor = "transparent";
@@ -752,7 +751,7 @@ export default function Page() {
                   width: "44px",
                   height: "44px",
                   borderRadius: "50%",
-                  backgroundColor: isLoading || !input.trim() ? "#cbd5e0" : "#9f7aea",
+                  backgroundColor: isLoading || !input.trim() ? "#cbd5e0" : "#828C6A",
                   color: "white",
                   border: "none",
                   cursor: isLoading || !input.trim() ? "not-allowed" : "pointer",
@@ -762,20 +761,20 @@ export default function Page() {
                   transition: "all 0.2s ease",
                   boxShadow: isLoading || !input.trim() 
                     ? "none" 
-                    : "0 2px 6px rgba(159, 122, 234, 0.3)",
+                    : "0 2px 6px rgba(130, 140, 106, 0.3)",
                 }}
                 onMouseEnter={(e) => {
                   if (!isLoading && input.trim()) {
-                    e.currentTarget.style.backgroundColor = "#8b6bb1";
+                    e.currentTarget.style.backgroundColor = "#A0AB89";
                     e.currentTarget.style.transform = "scale(1.05)";
-                    e.currentTarget.style.boxShadow = "0 4px 12px rgba(159, 122, 234, 0.4)";
+                    e.currentTarget.style.boxShadow = "0 4px 12px rgba(130, 140, 106, 0.4)";
                   }
                 }}
                 onMouseLeave={(e) => {
                   if (!isLoading && input.trim()) {
-                    e.currentTarget.style.backgroundColor = "#9f7aea";
+                    e.currentTarget.style.backgroundColor = "#828C6A";
                     e.currentTarget.style.transform = "scale(1)";
-                    e.currentTarget.style.boxShadow = "0 2px 6px rgba(159, 122, 234, 0.3)";
+                    e.currentTarget.style.boxShadow = "0 2px 6px rgba(130, 140, 106, 0.3)";
                   }
                 }}
               >
